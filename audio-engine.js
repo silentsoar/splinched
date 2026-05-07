@@ -1,0 +1,574 @@
+/**
+ * audio-engine.js
+ * Handles Web Audio API processing, chopping algorithms, and the step sequencer scheduler.
+ */
+
+class AudioEngine {
+    constructor() {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.buffer = null; // AudioBuffer
+        this.slices = []; // Array of { id, start, end, duration, pitch: {freq, midi, noteName} }
+        
+        // Output routing
+        this.globalGain = this.ctx.createGain();
+        this.globalGain.connect(this.ctx.destination);
+        
+        // Playback state
+        this.globalChoke = false;
+        this.activeSources = new Set();
+        
+        // Sequencer state
+        this.seqPattern = null;
+        this.seqBpm = 120;
+        this.seqDensity = 0.5;
+        this.seqSyncopation = 0.0;
+        this.seqNoteRepeat = 0.0;
+        this.seqMicroTiming = 0.0;
+        this.seqProbability = 1.0;
+        this.seqSwing = 0.0;
+        this.kickEnabled = true;
+        this.kickLevel = 0.3;
+        this.seqIsPlaying = false;
+        this.seqNextNoteTime = 0.0;
+        this.seqCurrentStep = 0;
+        this.seqTimerID = null;
+        this.seqLookahead = 25.0; // ms
+        this.seqScheduleAheadTime = 0.1; // s
+
+        this.onStepPlay = null; // Callback for UI visual sync
+
+        // Musical config
+        this.musicalKey = "C";
+        this.musicalMode = "ionian";
+
+        // Global ADSR
+        this.adsr = { attack: 0.02, decay: 0.15, sustain: 0.0, release: 0.08 };
+        
+        this.allSlices = {};
+        this.activeAlgo = 'transient';
+        this.padMapping = Array.from({length: 16}, (_, i) => i);
+    }
+
+    async loadAudio(arrayBuffer) {
+        if (this.ctx.state === 'suspended') await this.ctx.resume();
+        this.buffer = await this.ctx.decodeAudioData(arrayBuffer);
+        return this.buffer;
+    }
+
+    setMusicalConfig(key, mode, octave = 0) {
+        this.musicalKey = key;
+        this.musicalMode = mode;
+        this.musicalOctave = parseInt(octave) || 0;
+    }
+
+    // --- Slicing Algorithms ---
+
+    processAllAlgorithms(targetSlices) {
+        if (!this.buffer) return;
+        this.allSlices['grid'] = this.chopGrid(targetSlices);
+        this.allSlices['transient'] = this.chopTransient(targetSlices);
+        this.allSlices['random'] = this.chopRandom(targetSlices);
+        this.allSlices['silence'] = this.chopSilence(targetSlices);
+        this.allSlices['beatsync'] = this.chopBeatSync(targetSlices);
+        this.allSlices['golden'] = this.chopGolden(targetSlices);
+        this.padMapping = Array.from({length: 16}, (_, i) => i);
+    }
+
+    setActiveAlgorithm(algo) {
+        if (this.allSlices[algo]) {
+            this.activeAlgo = algo;
+            this.slices = this.allSlices[algo];
+        }
+    }
+
+    _finalizeSlices(cuts, targetSlices) {
+        // Enforce target slices limit roughly
+        if (cuts.length > targetSlices + 1) {
+            // Keep first, last, and evenly distribute the rest
+            const step = (cuts.length - 2) / (targetSlices - 1);
+            let newCuts = [cuts[0]];
+            for(let i=1; i<targetSlices; i++) {
+                newCuts.push(cuts[Math.floor(i * step)]);
+            }
+            newCuts.push(cuts[cuts.length - 1]);
+            cuts = newCuts;
+        }
+
+        this.slices = [];
+        for (let i = 0; i < cuts.length - 1; i++) {
+            const start = cuts[i];
+            const end = cuts[i+1];
+            
+            // Pitch analysis for this slice
+            const startSample = Math.floor(start * this.buffer.sampleRate);
+            const endSample = Math.floor(end * this.buffer.sampleRate);
+            const pitch = PitchDetector.analyzeSlice(this.buffer, startSample, endSample);
+
+            this.slices.push({
+                id: i,
+                start: start,
+                end: end,
+                duration: end - start,
+                pitch: pitch
+            });
+        }
+        return this.slices;
+    }
+
+    chopGrid(targetSlices) {
+        if (!this.buffer) return [];
+        const dur = this.buffer.duration;
+        let cuts = [];
+        for (let i = 0; i <= targetSlices; i++) {
+            cuts.push((i / targetSlices) * dur);
+        }
+        return this._finalizeSlices(cuts, targetSlices);
+    }
+
+    chopRandom(targetSlices) {
+        if (!this.buffer) return [];
+        const dur = this.buffer.duration;
+        let cuts = [0, dur];
+        for (let i = 0; i < targetSlices - 1; i++) cuts.push(Math.random() * dur);
+        cuts.sort((a,b) => a-b);
+        return this._finalizeSlices(cuts, targetSlices);
+    }
+
+    chopTransient(targetSlices) {
+        if (!this.buffer) return [];
+        const data = this.buffer.getChannelData(0);
+        const sr = this.buffer.sampleRate;
+        const dur = this.buffer.duration;
+        
+        let cuts = [0];
+        let threshold = 0.1; // start low, find peaks
+        let minSamples = 0.05 * sr;
+        let lastCut = 0;
+
+        // Simple peak finder
+        for(let i=0; i<data.length; i++) {
+            if(Math.abs(data[i]) > threshold && (i - lastCut) > minSamples) {
+                cuts.push(i / sr);
+                lastCut = i;
+            }
+        }
+        cuts.push(dur);
+        return this._finalizeSlices(cuts, targetSlices);
+    }
+
+    chopSilence(targetSlices) {
+        if (!this.buffer) return [];
+        const data = this.buffer.getChannelData(0);
+        const sr = this.buffer.sampleRate;
+        const dur = this.buffer.duration;
+        
+        let cuts = [0];
+        let isSilent = false;
+        let threshold = 0.02; 
+
+        for(let i=0; i<data.length; i+=100) { // check blocks
+            if(Math.abs(data[i]) < threshold && !isSilent) {
+                isSilent = true;
+                cuts.push(i / sr);
+            } else if (Math.abs(data[i]) >= threshold) {
+                isSilent = false;
+            }
+        }
+        cuts.push(dur);
+        cuts.sort((a,b)=>a-b);
+        return this._finalizeSlices(cuts, targetSlices);
+    }
+
+    chopBeatSync(targetSlices) {
+        // Assume 120 BPM for now if not analyzed
+        if (!this.buffer) return [];
+        const dur = this.buffer.duration;
+        const bps = 120 / 60;
+        const beatDur = 1 / bps;
+        let cuts = [];
+        for(let t=0; t<dur; t+=beatDur) cuts.push(t);
+        if(cuts[cuts.length-1] !== dur) cuts.push(dur);
+        return this._finalizeSlices(cuts, targetSlices);
+    }
+
+    chopGolden(targetSlices) {
+        if (!this.buffer) return [];
+        const dur = this.buffer.duration;
+        let cuts = [0, dur];
+        const PHI = 1.61803398875;
+        
+        // Recursively divide by Golden Ratio
+        let queue = [{start:0, end:dur}];
+        while(cuts.length < targetSlices + 1 && queue.length > 0) {
+            let seg = queue.shift();
+            let cutPoint = seg.start + (seg.end - seg.start) / PHI;
+            cuts.push(cutPoint);
+            queue.push({start: seg.start, end: cutPoint});
+            queue.push({start: cutPoint, end: seg.end});
+        }
+        cuts.sort((a,b)=>a-b);
+        return this._finalizeSlices(cuts, targetSlices);
+    }
+
+    // --- Playback & Sequencer ---
+
+    stopAllNodes() {
+        this.activeSources.forEach(src => {
+            try { src.stop(); } catch(e) {}
+        });
+        this.activeSources.clear();
+    }
+
+    _createSource(sliceId, time, playbackRate = 1.0, ctx = this.ctx, destination = this.globalGain) {
+        const slice = this.slices.find(s => s.id === sliceId);
+        if (!slice || !this.buffer) return null;
+
+        if (this.globalChoke && ctx === this.ctx) {
+            this.stopAllNodes();
+        }
+
+        const source = ctx.createBufferSource();
+        source.buffer = this.buffer;
+        source.playbackRate.value = playbackRate;
+
+        const gainNode = ctx.createGain();
+        
+        // ADSR Envelope
+        const A = this.adsr.attack;
+        const D = this.adsr.decay;
+        const S = this.adsr.sustain;
+        const R = this.adsr.release;
+
+        // Base slice duration (how long the note is logically "held" before release)
+        const holdDur = slice.duration / playbackRate;
+        
+        let audibleDur = holdDur + R;
+        // If sustain is zero, the sound dies completely after Attack + Decay phase
+        if (S <= 0.001) {
+            audibleDur = Math.min(holdDur, A + D);
+        }
+        
+        // Total physical play duration (bound by actual buffer length)
+        const maxAvailableDur = (this.buffer.duration - slice.start) / playbackRate;
+        const playDur = Math.min(audibleDur, maxAvailableDur);
+
+        gainNode.gain.setValueAtTime(0, time);
+        
+        // Attack
+        let peakTime = time + A;
+        if (peakTime > time + holdDur) peakTime = time + holdDur; // cap attack
+        gainNode.gain.linearRampToValueAtTime(1.0, peakTime);
+        
+        // Decay
+        let decayEndTime = peakTime + D;
+        if (decayEndTime > time + holdDur) decayEndTime = time + holdDur; // cap decay
+        gainNode.gain.linearRampToValueAtTime(S, decayEndTime);
+        
+        // Sustain (hold S until holdDur)
+        gainNode.gain.setValueAtTime(S, time + holdDur);
+        
+        // Release
+        const releaseEndTime = time + holdDur + R;
+        // avoid small clicks if R is very small by ensuring it goes to 0
+        gainNode.gain.linearRampToValueAtTime(0.0001, releaseEndTime);
+
+        source.connect(gainNode);
+        gainNode.connect(destination);
+
+        const playId = Math.random().toString(36).substr(2, 9);
+        
+        if (ctx === this.ctx) {
+            this.activeSources.add(source);
+            source.onended = () => {
+                this.activeSources.delete(source);
+                if (this.onSliceStop) this.onSliceStop(playId);
+            };
+        }
+
+        source.start(time, slice.start, playDur);
+        
+        if (ctx === this.ctx && this.onPlayheadStart) {
+            const delayMs = Math.max(0, (time - this.ctx.currentTime) * 1000);
+            setTimeout(() => this.onPlayheadStart(slice.start, playDur, playbackRate, sliceId, playId), delayMs);
+        }
+
+        return source;
+    }
+
+    playPad(sliceId, midiNoteOverride = -1) {
+        if(this.ctx.state === 'suspended') this.ctx.resume();
+        const slice = this.slices.find(s => s.id === sliceId);
+        if (!slice) return;
+
+        let rate = 1.0;
+        // If Chromatic mode (MIDI note override provided)
+        if (midiNoteOverride > 0 && slice.pitch.midi > 0) {
+            rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, midiNoteOverride);
+        }
+
+        this._createSource(sliceId, this.ctx.currentTime, rate);
+    }
+
+    // --- Scheduler ---
+    
+    startSequencer(pattern, bpm) {
+        if(this.ctx.state === 'suspended') this.ctx.resume();
+        this.seqPattern = pattern;
+        this.seqBpm = bpm;
+        this.seqCurrentStep = 0;
+        this.seqNextNoteTime = this.ctx.currentTime + 0.05;
+        this.seqIsPlaying = true;
+        this._scheduler();
+    }
+
+    stopSequencer() {
+        this.seqIsPlaying = false;
+        clearTimeout(this.seqTimerID);
+    }
+
+    _nextNote() {
+        const secondsPerBeat = 60.0 / this.seqBpm;
+        this.seqNextNoteTime += 0.25 * secondsPerBeat; // 16th notes
+        this.seqCurrentStep++;
+        if (this.seqCurrentStep >= this.seqPattern.length) {
+            this.seqCurrentStep = 0;
+        }
+    }
+
+    getMaskedPattern() {
+        if (!this.seqPattern || !this.seqPattern.steps) return [];
+        const pattern = this.seqPattern;
+        const N = pattern.steps.length;
+        const density = this.seqDensity;
+        const syncopation = this.seqSyncopation;
+        const prob = this.seqProbability;
+        const repeatLikelihood = this.seqNoteRepeat;
+        const microLikelihood = this.seqMicroTiming;
+        
+        // 1. Density: Calculate how many steps should be active
+        let targetActive = Math.round(N * density);
+        
+        let priorities = pattern.steps.map((step, i) => {
+            let score = 0;
+            if (step.active) score += 1000;
+            if (i % 4 === 0) score += 40;
+            else if (i % 2 === 0) score += 20;
+            else score += 10;
+            score += (i * 7 % 13) / 13;
+            return { index: i, score: score };
+        });
+        
+        priorities.sort((a, b) => b.score - a.score);
+        
+        let maskedActiveIndices = new Set();
+        for (let i = 0; i < targetActive; i++) {
+            maskedActiveIndices.add(priorities[i].index);
+        }
+        
+        // 2. Syncopation: Identify primary slices for repetition
+        let sliceFreq = {};
+        pattern.steps.forEach(s => {
+            if (s.active && s.sliceId !== undefined) {
+                sliceFreq[s.sliceId] = (sliceFreq[s.sliceId] || 0) + 1;
+            }
+        });
+        let sortedSlices = Object.keys(sliceFreq).sort((a, b) => sliceFreq[b] - sliceFreq[a]).map(Number);
+        const primarySlice = sortedSlices.length > 0 ? sortedSlices[0] : 0;
+        
+        // 3. Assemble Masked Pattern
+        const maskedSteps = pattern.steps.map((step, i) => {
+            let mActive = maskedActiveIndices.has(i);
+            let mSliceId = step.sliceId;
+            
+            // Syncopation increases the likelihood of remapping to the primary slice
+            if (mActive && mSliceId !== undefined && syncopation > 0) {
+                // Deterministic "randomness" based on index
+                const threshold = ((i * 31) % 100) / 100;
+                if (threshold < syncopation) {
+                    mSliceId = primarySlice;
+                }
+            }
+
+
+            let mRatchets = step.ratchets || 1;
+            let mMicroTiming = step.microTiming || 0;
+
+            if (mActive) {
+                // Note Repeat (Ratchet)
+                if (repeatLikelihood > 0 && Math.random() < repeatLikelihood) {
+                    // Randomly choose 2, 3, or 4 ratchets
+                    mRatchets = [2, 2, 2, 3, 3, 4][Math.floor(Math.random() * 6)];
+                }
+
+                // Micro-Timing (0-30ms)
+                if (microLikelihood > 0 && Math.random() < microLikelihood) {
+                    mMicroTiming = Math.random() * 0.030; // 0 to 30ms
+                }
+            }
+            
+            return {
+                ...step,
+                active: mActive,
+                sliceId: mSliceId,
+                ratchets: mRatchets,
+                microTiming: mMicroTiming
+            };
+        });
+        
+        this.lastMaskedPattern = maskedSteps;
+        return maskedSteps;
+    }
+
+    _playKick(time, ctx, destination) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(destination);
+
+        osc.frequency.setValueAtTime(150, time);
+        osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5);
+
+        gain.gain.setValueAtTime(this.kickLevel, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
+
+        osc.start(time);
+        osc.stop(time + 0.5);
+    }
+
+    _scheduleNote(stepNumber, baseTime) {
+        let time = baseTime;
+        const secondsPerBeat = 60.0 / this.seqBpm;
+        const stepDuration = 0.25 * secondsPerBeat;
+        
+        // Apply swing
+        if (stepNumber % 2 !== 0) {
+            const swingDelay = (this.seqSwing * stepDuration) * 0.5;
+            time += swingDelay;
+        }
+
+        if (this.onStepPlay) {
+            // Send UI update sync
+            setTimeout(() => this.onStepPlay(stepNumber), (time - this.ctx.currentTime) * 1000);
+        }
+
+        if (this.kickEnabled && stepNumber % 4 === 0) {
+            this._playKick(baseTime, this.ctx, this.globalGain);
+        }
+
+        const maskedPattern = this.getMaskedPattern();
+        const stepData = maskedPattern[stepNumber];
+        if (!stepData || !stepData.active) return;
+
+        // Apply Probability during playback only (not reflected in UI)
+        if (this.seqProbability < 1.0 && Math.random() > this.seqProbability) return;
+
+        if (this.slices.length === 0) return;
+
+        // Apply microTiming
+        if (stepData.microTiming) {
+            time += stepData.microTiming; // It's already in seconds in my new logic
+        }
+
+        const sliceIdLookup = stepData.sliceId !== undefined ? stepData.sliceId : stepNumber;
+        const sliceId = sliceIdLookup % this.slices.length;
+        const slice = this.slices[sliceId];
+
+        let rate = 1.0;
+        if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
+            if (slice.pitch.midi > 0) {
+                const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
+                const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                let idx = validNotes.indexOf(closestMidi);
+                if (idx !== -1) {
+                    idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                    const targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                    rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
+                }
+            }
+        }
+
+        let ratchets = stepData.ratchets || 1;
+        const ratchetSpacing = stepDuration / ratchets;
+        
+        for (let r = 0; r < ratchets; r++) {
+            let t = time + (r * ratchetSpacing);
+            this._createSource(sliceId, t, rate);
+        }
+    }
+
+    _scheduler() {
+        while (this.seqNextNoteTime < this.ctx.currentTime + this.seqScheduleAheadTime) {
+            this._scheduleNote(this.seqCurrentStep, this.seqNextNoteTime);
+            this._nextNote();
+        }
+        if (this.seqIsPlaying) {
+            this.seqTimerID = setTimeout(() => this._scheduler(), this.seqLookahead);
+        }
+    }
+
+    // --- Offline Render ---
+    
+    async renderSequenceToBuffer() {
+        if (!this.seqPattern || this.slices.length === 0 || !this.buffer) return null;
+        
+        const secondsPerBeat = 60.0 / this.seqBpm;
+        const totalTime = (this.seqPattern.length * 0.25 * secondsPerBeat);
+        
+        const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+            this.buffer.numberOfChannels, 
+            Math.ceil(totalTime * this.buffer.sampleRate), 
+            this.buffer.sampleRate
+        );
+
+        let baseTime = 0;
+        const maskedPattern = this.getMaskedPattern();
+        for(let stepNumber=0; stepNumber < this.seqPattern.length; stepNumber++) {
+            if (this.kickEnabled && stepNumber % 4 === 0) {
+                this._playKick(baseTime, offlineCtx, offlineCtx.destination);
+            }
+
+            const stepData = maskedPattern[stepNumber];
+            if (stepData && stepData.active) {
+                let time = baseTime;
+                const stepDuration = 0.25 * secondsPerBeat;
+                
+                if (stepNumber % 2 !== 0) {
+                    const swingDelay = (this.seqSwing * stepDuration) * 0.5;
+                    time += swingDelay;
+                }
+                
+                if (stepData.microTiming) {
+                    time += (stepData.microTiming * stepDuration);
+                }
+
+                const sliceIdLookup = stepData.sliceId !== undefined ? stepData.sliceId : stepNumber;
+                const sliceId = sliceIdLookup % this.slices.length;
+                const slice = this.slices[sliceId];
+
+                let rate = 1.0;
+                if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined && slice.pitch.midi > 0) {
+                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
+                    const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                    let idx = validNotes.indexOf(closestMidi);
+                    if (idx !== -1) {
+                        idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                        const targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                        rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
+                    }
+                }
+
+                let ratchets = stepData.ratchets || 1;
+                const ratchetSpacing = stepDuration / ratchets;
+                
+                for (let r = 0; r < ratchets; r++) {
+                    let t = time + (r * ratchetSpacing);
+                    this._createSource(sliceId, t, rate, offlineCtx, offlineCtx.destination);
+                }
+            }
+            baseTime += 0.25 * secondsPerBeat;
+        }
+
+        const renderedBuffer = await offlineCtx.startRendering();
+        return renderedBuffer;
+    }
+}

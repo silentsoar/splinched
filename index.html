@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Splinched</title>
+    <meta name="description" content="Professional web-based music sample chopper and sequencer.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- JSZip for exporting ZIP files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo">
+                <i class="fas fa-wave-square"></i>
+                <h1>Splinched</h1>
+            </div>
+            <div class="header-controls">
+                <button class="btn btn-secondary midi-status" id="midi-status" title="Connect MIDI">
+                    <i class="fas fa-plug"></i> Connect MIDI
+                </button>
+                <button id="btn-record" class="btn btn-secondary" title="Record Audio">
+                    <i class="fas fa-microphone"></i> Record
+                </button>
+                <label for="audio-upload" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Upload Audio
+                </label>
+                <input type="file" id="audio-upload" accept="audio/*" class="hidden-input">
+            </div>
+        </header>
+
+        <main class="app-main">
+            <!-- Upload Overlay -->
+            <div id="upload-overlay" class="upload-overlay">
+                <div class="upload-content">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <h2>Drag & Drop Audio File Here</h2>
+                    <p>Supports WAV, MP3, OGG</p>
+                    <div style="margin-top: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">or</div>
+                    <button id="btn-load-demo" class="btn btn-outline" style="margin-top: 1rem; pointer-events: auto;">
+                        <i class="fas fa-play-circle"></i> Load Demo Track
+                    </button>
+                </div>
+            </div>
+
+            <div class="workspace hidden" id="workspace">
+                <!-- Top Panel: Waveform -->
+                <div class="waveform-section panel glass">
+                    <div class="section-header">
+                        <div style="display: flex; flex-direction: column;">
+                            <h2>Interactive Waveform <span class="hint">(Click slices to play)</span></h2>
+                            <div id="filename-display" style="font-size: 0.8rem; color: var(--accent-secondary); margin-top: 4px;"></div>
+                        </div>
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <div class="playback-controls">
+                                <button id="btn-play-all" class="btn btn-icon"><i class="fas fa-play"></i></button>
+                                <button id="btn-stop-all" class="btn btn-icon"><i class="fas fa-stop"></i></button>
+                            </div>
+                            <i class="fas fa-chevron-down collapse-icon"></i>
+                        </div>
+                    </div>
+                    <div class="canvas-container" id="canvas-container">
+                        <canvas id="waveform-canvas"></canvas>
+                        <div id="playhead" style="position: absolute; top: 0; bottom: 0; width: 2px; background-color: var(--accent-danger); left: 0; display: none; pointer-events: none; z-index: 10; box-shadow: 0 0 8px var(--accent-danger);"></div>
+                        <!-- Click overlay generated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Middle Panel: Configuration & Sequencer -->
+                <div class="middle-layout">
+                    <!-- Left: Algorithm Config -->
+                    <div class="config-section panel glass">
+                        <div class="section-header">
+                            <h2>Engine Configuration</h2>
+                            <i class="fas fa-chevron-down collapse-icon"></i>
+                        </div>
+                        
+                        <div class="param-row">
+                            <div class="param-group">
+                                <label for="algorithm-select">Algorithm</label>
+                                <select id="algorithm-select" class="custom-select">
+                                    <option value="grid">Grid (Equal Spacing)</option>
+                                    <option value="transient" selected>Transient (Auto-Detection)</option>
+                                    <option value="random">Random (Chaos)</option>
+                                    <option value="silence">Silence (Split at Zero)</option>
+                                    <option value="beatsync">Beat-Sync (Tempo Locked)</option>
+                                    <option value="golden">Golden Ratio (Recursive)</option>
+                                </select>
+                            </div>
+                            <div class="param-group">
+                                <label for="target-slices">Target Slices</label>
+                                <select id="target-slices" class="custom-select">
+                                    <option value="2">2</option>
+                                    <option value="4">4</option>
+                                    <option value="6">6</option>
+                                    <option value="8">8</option>
+                                    <option value="16">16</option>
+                                    <option value="32" selected>32</option>
+                                    <option value="64">64</option>
+                                    <option value="256">256</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="param-row mt-1rem">
+                            <div class="param-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="global-choke" class="custom-checkbox">
+                                <label for="global-choke" style="margin: 0; cursor: pointer;">Global Choke (Monophonic)</label>
+                            </div>
+                        </div>
+
+                        <!-- ADSR Controls -->
+                        <div class="sub-header mt-1rem">
+                            <h3>Global Envelope (ADSR)</h3>
+                        </div>
+                        <div class="adsr-viz-container" style="height: 60px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 0.75rem; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
+                            <canvas id="adsr-visualizer" style="width: 100%; height: 100%;"></canvas>
+                        </div>
+                        <div class="param-row">
+                            <div class="param-group flex-1">
+                                <label for="adsr-a">A <span id="val-a" class="hint">20ms</span></label>
+                                <input type="range" id="adsr-a" min="0" max="100" value="14">
+                            </div>
+                            <div class="param-group flex-1">
+                                <label for="adsr-d">D <span id="val-d" class="hint">150ms</span></label>
+                                <input type="range" id="adsr-d" min="0" max="100" value="39">
+                            </div>
+                        </div>
+                        <div class="param-row">
+                            <div class="param-group flex-1">
+                                <label for="adsr-s">S <span id="val-s" class="hint">0ms</span></label>
+                                <input type="range" id="adsr-s" min="0" max="100" value="0">
+                            </div>
+                            <div class="param-group flex-1">
+                                <label for="adsr-r">R <span id="val-r" class="hint">80ms</span></label>
+                                <input type="range" id="adsr-r" min="0" max="100" value="28">
+                            </div>
+                        </div>
+
+                        <!-- Specific algorithm params container -->
+                        <div id="algo-params-container" class="mt-1rem">
+                            <!-- Populated dynamically -->
+                        </div>
+                        
+                        <div class="sub-header mt-1rem">
+                            <h3>Musicality</h3>
+                        </div>
+                        <div class="param-row">
+                            <div class="param-group">
+                                <label for="key-select">Key</label>
+                                <select id="key-select" class="custom-select">
+                                    <option value="C">C</option>
+                                    <option value="C#">C# / Db</option>
+                                    <option value="D">D</option>
+                                    <option value="D#">D# / Eb</option>
+                                    <option value="E">E</option>
+                                    <option value="F">F</option>
+                                    <option value="F#">F# / Gb</option>
+                                    <option value="G">G</option>
+                                    <option value="G#">G# / Ab</option>
+                                    <option value="A" selected>A</option>
+                                    <option value="A#">A# / Bb</option>
+                                    <option value="B">B</option>
+                                </select>
+                            </div>
+                            <div class="param-group">
+                                <label for="mode-select">Mode</label>
+                                <select id="mode-select" class="custom-select">
+                                    <option value="ionian">Ionian (Major)</option>
+                                    <option value="dorian">Dorian</option>
+                                    <option value="phrygian">Phrygian</option>
+                                    <option value="lydian">Lydian</option>
+                                    <option value="mixolydian">Mixolydian</option>
+                                    <option value="aeolian" selected>Aeolian (Minor)</option>
+                                    <option value="locrian">Locrian</option>
+                                </select>
+                            </div>
+                            <div class="param-group" style="width: 80px;">
+                                <label for="octave-select">Octave</label>
+                                <select id="octave-select" class="custom-select">
+                                    <option value="-2">-2</option>
+                                    <option value="-1">-1</option>
+                                    <option value="0" selected>0</option>
+                                    <option value="1">+1</option>
+                                    <option value="2">+2</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="auto-key-display" class="mt-05rem" style="font-size: 0.8rem; color: var(--accent-primary); font-weight: 600; display: none;">
+                            <i class="fas fa-magic"></i> Auto-detected: <span id="detected-key-value">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Right: Sequencer -->
+                    <div class="sequencer-section panel glass">
+                        <div class="section-header">
+                            <h2>Step Sequencer</h2>
+                            <div style="display: flex; gap: 1rem; align-items: center;">
+                                <div class="playback-controls">
+                                    <button id="btn-seq-play" class="btn btn-icon"><i class="fas fa-play"></i></button>
+                                    <button id="btn-seq-stop" class="btn btn-icon"><i class="fas fa-stop"></i></button>
+                                </div>
+                                <i class="fas fa-chevron-down collapse-icon"></i>
+                            </div>
+                        </div>
+                        
+                        <div class="param-row">
+                            <div class="param-group flex-1">
+                                <label for="pattern-select">Pattern</label>
+                                <select id="pattern-select" class="custom-select">
+                                    <!-- Populated by JS -->
+                                </select>
+                            </div>
+                            <div class="param-group" style="width: 100px;">
+                                <label for="seq-bpm">BPM</label>
+                                <input type="number" id="seq-bpm" value="120" min="40" max="300" class="custom-select">
+                            </div>
+                        </div>
+
+                        <div class="param-row mt-05rem">
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; width: 100%;">
+                                <button id="btn-rand-rhythmic" class="btn btn-secondary flex-1" title="Random Rhythmic"><i class="fas fa-dice"></i> Rhythmic</button>
+                                <button id="btn-rand-melodic" class="btn btn-secondary flex-1" title="Random Melodic"><i class="fas fa-dice"></i> Melodic</button>
+                                <button id="btn-reroll-slices" class="btn btn-secondary flex-1" title="Re-roll Slices"><i class="fas fa-random"></i> Slices</button>
+                                <button id="btn-save-pattern" class="btn btn-secondary flex-1" title="Save Pattern to LocalStorage"><i class="fas fa-save"></i> Save</button>
+                            </div>
+                        </div>
+
+                        <!-- Euclidean Generator -->
+                        <div class="param-row mt-1rem" style="background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 8px;">
+                            <div class="param-group flex-1">
+                                <label for="euclidean-steps">Euc. Steps</label>
+                                <input type="number" id="euclidean-steps" value="16" min="1" max="64" class="custom-select">
+                            </div>
+                            <div class="param-group flex-1">
+                                <label for="euclidean-pulses">Euc. Pulses</label>
+                                <input type="number" id="euclidean-pulses" value="5" min="1" max="64" class="custom-select">
+                            </div>
+                            <div class="param-group">
+                                <label>&nbsp;</label>
+                                <button id="btn-generate-euclidean" class="btn btn-outline" style="height: 100%;">Generate</button>
+                            </div>
+                        </div>
+
+                        <div class="param-row mt-1rem">
+                            <div class="param-group">
+                                <label for="seq-density">Density <span id="val-density" class="hint">50%</span></label>
+                                <input type="range" id="seq-density" min="0" max="100" value="50">
+                            </div>
+                            <div class="param-group">
+                                <label for="seq-syncopation">Syncopation <span id="val-syncopation" class="hint">0%</span></label>
+                                <input type="range" id="seq-syncopation" min="0" max="100" value="0">
+                            </div>
+                            <div class="param-group">
+                                <label for="seq-note-repeat">Note Repeat <span id="val-note-repeat" class="hint">0%</span></label>
+                                <input type="range" id="seq-note-repeat" min="0" max="100" value="0">
+                            </div>
+                            <div class="param-group">
+                                <label for="seq-micro-timing">Micro-Timing <span id="val-micro-timing" class="hint">0%</span></label>
+                                <input type="range" id="seq-micro-timing" min="0" max="100" value="0">
+                            </div>
+                            <div class="param-group">
+                                <label for="seq-probability">Probability <span id="val-probability" class="hint">100%</span></label>
+                                <input type="range" id="seq-probability" min="0" max="100" value="100">
+                            </div>
+                            <div class="param-group">
+                                <label for="seq-swing">Swing <span id="val-swing" class="hint">0%</span></label>
+                                <input type="range" id="seq-swing" min="0" max="100" value="0">
+                            </div>
+                            <div class="param-group">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <label for="kick-level" style="margin: 0;">Kick <span id="val-kick" class="hint">30%</span></label>
+                                    <div style="display: flex; align-items: center; gap: 0.25rem;">
+                                        <label for="kick-drum" style="margin:0; font-size: 0.8rem;">On</label>
+                                        <input type="checkbox" id="kick-drum" class="custom-checkbox" checked title="Enable Kick">
+                                    </div>
+                                </div>
+                                <input type="range" id="kick-level" min="0" max="100" value="30">
+                            </div>
+                        </div>
+
+                        <!-- Visual Sequencer Grid -->
+                        <div class="seq-grid-container mt-1rem">
+                            <div id="seq-grid" class="seq-grid">
+                                <!-- Steps populated dynamically -->
+                            </div>
+                        </div>
+
+                        <div class="export-actions mt-1rem">
+                            <button id="btn-export-seq" class="btn btn-primary full-width">
+                                <i class="fas fa-file-audio"></i> Export Sequence as WAV
+                            </button>
+                            <button id="btn-export-zip" class="btn btn-outline full-width mt-05rem">
+                                <i class="fas fa-file-archive"></i> Export All Slices (ZIP)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Panel: Pads -->
+                <div class="pads-section panel glass">
+                    <div class="section-header">
+                        <h2>Slices Bank <span class="hint">MIDI enabled / Keyboard mapped</span></h2>
+                        <i class="fas fa-chevron-down collapse-icon"></i>
+                    </div>
+                    <div id="pads-container" class="pads-grid">
+                        <!-- Pads generated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Recording Overlay -->
+        <div id="recording-overlay" class="modal-overlay hidden">
+            <div class="modal glass">
+                <h2>Recording Audio...</h2>
+                <div class="recording-indicator">
+                    <div class="pulse"></div>
+                </div>
+                <div class="recording-time" id="recording-time">00:00</div>
+                <button id="btn-stop-record" class="btn btn-danger">Stop Recording</button>
+            </div>
+        </div>
+
+        <!-- Premium Loading Overlay -->
+        <div id="loading-overlay" class="modal-overlay hidden">
+            <div class="loading-content glass">
+                <div class="loading-visual">
+                    <div class="loading-ring"></div>
+                    <div class="loading-ring"></div>
+                    <div class="loading-ring"></div>
+                    <i class="fas fa-wave-square loading-icon"></i>
+                </div>
+                <h2 id="loading-title">Processing...</h2>
+                <p id="loading-subtitle">Optimizing your audio experience</p>
+                <div class="loading-bar-container">
+                    <div id="loading-bar" class="loading-bar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="pitch-detector.js"></script>
+    <script src="sequencer-patterns.js"></script>
+    <script src="wav-encoder.js"></script>
+    <script src="audio-engine.js"></script>
+    <script src="midi-handler.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
