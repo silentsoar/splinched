@@ -60,6 +60,7 @@ const valProbability = document.getElementById('val-probability');
 
 const btnRandRhythmic = document.getElementById('btn-rand-rhythmic');
 const btnRandMelodic = document.getElementById('btn-rand-melodic');
+const btnRandAlgo = document.getElementById('btn-rand-algo');
 const btnRerollSlices = document.getElementById('btn-reroll-slices');
 const btnSavePattern = document.getElementById('btn-save-pattern');
 const eucSteps = document.getElementById('euclidean-steps');
@@ -581,6 +582,80 @@ function setupEventListeners() {
         if (melodics.length === 0) return;
         const rand = melodics[Math.floor(Math.random() * melodics.length)];
         patternSelect.value = rand.id;
+        patternSelect.dispatchEvent(new Event('change'));
+    });
+
+    btnRandAlgo.addEventListener('click', () => {
+        if (!engine.buffer || engine.slices.length === 0) return;
+        
+        const len = 16;
+        const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode);
+        
+        // Advanced Melodic Contour Generator
+        let currentIdx = Math.floor(validNotes.length / 2); 
+        let lastLeap = 0; 
+        const steps = [];
+        
+        for (let i = 0; i < len; i++) {
+            const isActive = Math.random() < engine.seqDensity;
+            if (isActive) {
+                let interval;
+                const r = Math.random();
+                
+                if (Math.abs(lastLeap) >= 3) {
+                    interval = lastLeap > 0 ? -1 - Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2);
+                    lastLeap = 0;
+                } else {
+                    if (r < 0.6) {
+                        interval = Math.floor(Math.random() * 5) - 2;
+                    } else if (r < 0.9) {
+                        interval = Math.random() > 0.5 ? 3 : -3;
+                        if (Math.random() > 0.5) interval += (interval > 0 ? 1 : -1);
+                        lastLeap = interval;
+                    } else {
+                        interval = Math.random() > 0.5 ? 7 : -7;
+                        lastLeap = interval;
+                    }
+                }
+
+                currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + interval));
+                const center = Math.floor(validNotes.length / 2);
+                if (Math.abs(currentIdx - center) > 7 && Math.random() > 0.7) {
+                    currentIdx += (currentIdx > center ? -2 : 2);
+                }
+
+                const sliceId = Math.floor(Math.random() * engine.slices.length);
+                const slice = engine.slices[sliceId];
+                
+                let melodicOffset = 0;
+                if (slice.pitch && slice.pitch.midi > 0) {
+                    const sliceBaseMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, engine.musicalKey, engine.musicalMode);
+                    const sliceBaseIdx = validNotes.indexOf(sliceBaseMidi);
+                    if (sliceBaseIdx !== -1) {
+                        melodicOffset = currentIdx - sliceBaseIdx;
+                    }
+                }
+                
+                steps.push({ step: i, active: true, sliceId: sliceId, melodicOffset: melodicOffset });
+            } else {
+                steps.push({ step: i, active: false, sliceId: i % engine.slices.length });
+            }
+        }
+        
+        const newPat = {
+            id: 'algo_' + Date.now(),
+            name: 'Algorithmic ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
+            type: 'melodic',
+            length: len,
+            steps: steps,
+            isCustom: true
+        };
+        
+        SequencerPatterns.push(newPat);
+        saveCustomPatterns();
+        populatePatterns();
+        
+        patternSelect.value = newPat.id;
         patternSelect.dispatchEvent(new Event('change'));
     });
 
