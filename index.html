@@ -139,6 +139,12 @@
                                 <input type="range" id="adsr-r" min="0" max="100" value="28">
                             </div>
                         </div>
+                        <div class="param-row">
+                            <div class="param-group flex-1">
+                                <label for="adsr-deviation">Deviation <span id="val-adsr-deviation" class="hint">0%</span></label>
+                                <input type="range" id="adsr-deviation" min="0" max="100" value="50">
+                            </div>
+                        </div>
 
                         <!-- Specific algorithm params container -->
                         <div id="algo-params-container" class="mt-1rem">
@@ -224,7 +230,7 @@
                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; width: 100%;">
                                 <button id="btn-rand-rhythmic" class="btn btn-secondary flex-1" title="Random Rhythmic"><i class="fas fa-dice"></i> Rhythmic</button>
                                 <button id="btn-rand-melodic" class="btn btn-secondary flex-1" title="Random Melodic"><i class="fas fa-dice"></i> Melodic</button>
-                                <button id="btn-rand-algo" class="btn btn-primary flex-1" title="Algorithmic Melody"><i class="fas fa-dice"></i> Algorithmic</button>
+                                <button id="btn-rand-algo" class="btn btn-secondary flex-1" title="Algorithmic Melody"><i class="fas fa-dice"></i> Algorithmic</button>
                                 <button id="btn-reroll-slices" class="btn btn-secondary flex-1" title="Re-roll Slices"><i class="fas fa-random"></i> Slices</button>
                                 <button id="btn-save-pattern" class="btn btn-secondary flex-1" title="Save Pattern to LocalStorage"><i class="fas fa-save"></i> Save</button>
                             </div>

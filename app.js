@@ -57,6 +57,8 @@ const valSwing = document.getElementById('val-swing');
 const valNoteRepeat = document.getElementById('val-note-repeat');
 const valMicroTiming = document.getElementById('val-micro-timing');
 const valProbability = document.getElementById('val-probability');
+const adsrDeviationSlider = document.getElementById('adsr-deviation');
+const valAdsrDeviation = document.getElementById('val-adsr-deviation');
 
 const btnRandRhythmic = document.getElementById('btn-rand-rhythmic');
 const btnRandMelodic = document.getElementById('btn-rand-melodic');
@@ -148,7 +150,8 @@ const SLIDER_DEFAULTS = {
     'seq-micro-timing': 0,
     'seq-probability': 100,
     'seq-swing': 0,
-    'kick-level': fromLogPercent(0.3)
+    'kick-level': fromLogPercent(0.3),
+    'adsr-deviation': 50
 };
 
 function updateSliderUI(slider) {
@@ -496,6 +499,15 @@ function setupEventListeners() {
     adsrD.addEventListener('input', updateAdsr);
     adsrS.addEventListener('input', updateAdsr);
     adsrR.addEventListener('input', updateAdsr);
+    adsrDeviationSlider.addEventListener('input', (e) => {
+        updateSliderUI(e.target);
+        const sliderVal = parseInt(e.target.value);
+        const normalized = (sliderVal - 50) / 50; // -1 to 1
+        const deviated = Math.pow(Math.abs(normalized), 2) * (normalized < 0 ? -1.5 : 1.5);
+        valAdsrDeviation.textContent = `${Math.round(deviated * 100)}%`;
+        engine.adsrDeviation = deviated;
+        saveSettings();
+    });
     // updateAdsr(); called by loadSettings
 
     // Sequencer changes
@@ -588,7 +600,7 @@ function setupEventListeners() {
     btnRandAlgo.addEventListener('click', () => {
         if (!engine.buffer || engine.slices.length === 0) return;
         
-        const len = 16;
+        const len = 32;
         const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode);
         
         // Advanced Melodic Contour Generator

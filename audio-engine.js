@@ -234,10 +234,18 @@ class AudioEngine {
         const gainNode = ctx.createGain();
         
         // ADSR Envelope
-        const A = this.adsr.attack;
-        const D = this.adsr.decay;
+        let A = this.adsr.attack;
+        let D = this.adsr.decay;
         const S = this.adsr.sustain;
-        const R = this.adsr.release;
+        let R = this.adsr.release;
+
+        if (this.adsrDeviation !== 0) {
+            // Deviate between 0 and X, where X is adsrDeviation
+            const mult = 1.0 + (Math.random() * this.adsrDeviation);
+            A *= Math.max(0.001, mult);
+            D *= Math.max(0.001, mult);
+            R *= Math.max(0.001, mult);
+        }
 
         // Base slice duration (how long the note is logically "held" before release)
         const holdDur = slice.duration / playbackRate;

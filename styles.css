@@ -130,9 +130,17 @@ body {
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     border: none;
     outline: none;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.btn:active:not(:disabled),
+label.btn:active {
+    transform: scale(0.96) translateY(0);
+    filter: brightness(1.1);
 }
 
 .btn-primary {
