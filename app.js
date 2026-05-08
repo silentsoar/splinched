@@ -879,7 +879,9 @@ async function loadAndProcessArrayBuffer(arrayBuffer) {
         workspace.classList.remove('hidden');
         engine.setMusicalConfig(keySelect.value, modeSelect.value, octaveSelect.value);
         handleResize();
-        processAudio();
+        // Delay to ensure workspace layout is computed
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await processAudio();
     } catch (err) {
         alert("Error decoding audio file. " + err.message);
     }
