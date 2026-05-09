@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Splinched</title>
+    <title>Splinched | Advanced Sample Chopper</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><path fill='none' stroke='%236366f1' stroke-width='40' d='M0 256h96V96h64v320h64V256h128v128h64V256h96'/></svg>">
     <meta name="description" content="Professional web-based music sample chopper and sequencer.">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -59,7 +60,6 @@
                                 <button id="btn-play-all" class="btn btn-icon"><i class="fas fa-play"></i></button>
                                 <button id="btn-stop-all" class="btn btn-icon"><i class="fas fa-stop"></i></button>
                             </div>
-                            <i class="fas fa-chevron-down collapse-icon"></i>
                         </div>
                     </div>
                     <div class="canvas-container" id="canvas-container">
@@ -69,13 +69,50 @@
                     </div>
                 </div>
 
+                <!-- Effects Strip -->
+                <div id="effects-strip" class="effects-strip glass mt-1rem">
+                    <button id="btn-fx-toggle" class="btn btn-icon active" title="Toggle FX (Bypass)" style="margin-right: 0.5rem; background: var(--accent-primary); color: white;">
+                        <i class="fas fa-power-off"></i>
+                    </button>
+                    <div class="fx-item">
+                        <label>Reverb</label>
+                        <input type="range" id="fx-reverb" class="is-default" min="0" max="1" step="0.01" value="0">
+                        <span class="val" id="val-reverb">0%</span>
+                    </div>
+                    <div class="fx-item">
+                        <label>Delay</label>
+                        <input type="range" id="fx-delay" class="is-default" min="0" max="1" step="0.01" value="0">
+                        <span class="val" id="val-delay">0%</span>
+                    </div>
+                    <div class="fx-item">
+                        <label>Distort</label>
+                        <input type="range" id="fx-distort" class="is-default" min="0" max="1" step="0.01" value="0">
+                        <span class="val" id="val-distort">0%</span>
+                    </div>
+                    <div class="fx-divider"></div>
+                    <div class="fx-item">
+                        <label>EQ Low</label>
+                        <input type="range" id="fx-eq-low" class="is-default" min="-12" max="12" step="1" value="0">
+                        <span class="val" id="val-eq-low">0dB</span>
+                    </div>
+                    <div class="fx-item">
+                        <label>EQ Mid</label>
+                        <input type="range" id="fx-eq-mid" class="is-default" min="-12" max="12" step="1" value="0">
+                        <span class="val" id="val-eq-mid">0dB</span>
+                    </div>
+                    <div class="fx-item">
+                        <label>EQ High</label>
+                        <input type="range" id="fx-eq-high" class="is-default" min="-12" max="12" step="1" value="0">
+                        <span class="val" id="val-eq-high">0dB</span>
+                    </div>
+                </div>
+
                 <!-- Middle Panel: Configuration & Sequencer -->
                 <div class="middle-layout">
                     <!-- Left: Algorithm Config -->
                     <div class="config-section panel glass">
                         <div class="section-header">
                             <h2>Engine Configuration</h2>
-                            <i class="fas fa-chevron-down collapse-icon"></i>
                         </div>
                         
                         <div class="param-row">
@@ -209,7 +246,6 @@
                                     <button id="btn-seq-play" class="btn btn-icon"><i class="fas fa-play"></i></button>
                                     <button id="btn-seq-stop" class="btn btn-icon"><i class="fas fa-stop"></i></button>
                                 </div>
-                                <i class="fas fa-chevron-down collapse-icon"></i>
                             </div>
                         </div>
                         
@@ -228,11 +264,44 @@
 
                         <div class="param-row mt-05rem">
                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; width: 100%;">
-                                <button id="btn-rand-rhythmic" class="btn btn-secondary flex-1" title="Random Rhythmic"><i class="fas fa-dice"></i> Rhythmic</button>
-                                <button id="btn-rand-melodic" class="btn btn-secondary flex-1" title="Random Melodic"><i class="fas fa-dice"></i> Melodic</button>
-                                <button id="btn-rand-algo" class="btn btn-secondary flex-1" title="Algorithmic Melody"><i class="fas fa-dice"></i> Algorithmic</button>
+                                <button id="btn-rand-rhythmic" class="btn btn-outline flex-1" title="Random Rhythmic"><i class="fas fa-drum"></i> Rhythmic</button>
+                                <button id="btn-rand-melodic" class="btn btn-outline flex-1" title="Random Melodic"><i class="fas fa-music"></i> Melodic</button>
                                 <button id="btn-reroll-slices" class="btn btn-secondary flex-1" title="Re-roll Slices"><i class="fas fa-random"></i> Slices</button>
                                 <button id="btn-save-pattern" class="btn btn-secondary flex-1" title="Save Pattern to LocalStorage"><i class="fas fa-save"></i> Save</button>
+                            </div>
+                        </div>
+
+                        <div class="param-row mt-05rem">
+                            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; width: 100%; align-items: center;">
+                                <select id="algo-len" class="custom-select" style="max-width: 65px; background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4);" title="Generation Length">
+                                    <option value="8">8</option>
+                                    <option value="16">16</option>
+                                    <option value="32" selected>32</option>
+                                    <option value="64">64</option>
+                                    <option value="128">128</option>
+                                    <option value="256">256</option>
+                                </select>
+                                <button id="btn-algo-brownian" class="btn btn-secondary flex-1" title="Brownian Contour" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-wave-square"></i> Brown</button>
+                                <button id="btn-algo-intervallic" class="btn btn-secondary flex-1" title="Intervallic Jumps" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-arrows-alt-v"></i> Jump</button>
+                                <button id="btn-algo-euclidean" class="btn btn-secondary flex-1" title="Euclidean Arpeggio" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-shapes"></i> Euc</button>
+                                <button id="btn-algo-harmonic" class="btn btn-secondary flex-1" title="Harmonic Gates" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-layer-group"></i> Chord</button>
+                                <button id="btn-algo-markov" class="btn btn-secondary flex-1" title="Markov Chain" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-project-diagram"></i> Mark</button>
+                                <button id="btn-algo-stochastic" class="btn btn-secondary flex-1" title="Stochastic Chaos" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-bolt"></i> IDM</button>
+                                <button id="btn-algo-mirror" class="btn btn-secondary flex-1" title="Mirror Symmetry" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-arrows-alt-h"></i> Mirror</button>
+                                <button id="btn-algo-pedal" class="btn btn-secondary flex-1" title="Pedal Point" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-anchor"></i> Pedal</button>
+                            </div>
+                        </div>
+
+                        <div class="param-row mt-05rem">
+                            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; width: 100%; align-items: center;">
+                                <button id="btn-algo-bitwise" class="btn btn-secondary flex-1" title="Bitwise Logic" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-microchip"></i> Bit</button>
+                                <button id="btn-algo-cellular" class="btn btn-secondary flex-1" title="Cellular Automata" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-border-all"></i> Cell</button>
+                                <button id="btn-algo-fibonacci" class="btn btn-secondary flex-1" title="Fibonacci Sequence" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-infinity"></i> Fibo</button>
+                                <button id="btn-algo-anchor" class="btn btn-secondary flex-1" title="Anchor Drone" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-anchor"></i> Anch</button>
+                                <button id="btn-algo-acid" class="btn btn-secondary flex-1" title="Acid Runs" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-flask"></i> Acid</button>
+                                <button id="btn-algo-phasing" class="btn btn-secondary flex-1" title="Minimalist Phasing" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-sync-alt"></i> Phase</button>
+                                <button id="btn-algo-motif" class="btn btn-secondary flex-1" title="Motif Box" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-box"></i> Motif</button>
+                                <button id="btn-algo-pedalum" class="btn btn-secondary flex-1" title="Pendulum Swings" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-clock"></i> Pend</button>
                             </div>
                         </div>
 
@@ -287,6 +356,12 @@
                                 </div>
                                 <input type="range" id="kick-level" min="0" max="100" value="30">
                             </div>
+                            <div class="param-group" style="justify-content: flex-end; padding-bottom: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.6rem; background: rgba(99, 102, 241, 0.1); padding: 0.6rem 1rem; border-radius: var(--radius-md); border: 1px solid rgba(99, 102, 241, 0.3); transition: all 0.2s;">
+                                    <input type="checkbox" id="seq-tone-only" class="custom-checkbox">
+                                    <label for="seq-tone-only" style="margin: 0; cursor: pointer; color: var(--accent-secondary); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase;">Tone Only</label>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Visual Sequencer Grid -->
@@ -311,7 +386,6 @@
                 <div class="pads-section panel glass">
                     <div class="section-header">
                         <h2>Slices Bank <span class="hint">MIDI enabled / Keyboard mapped</span></h2>
-                        <i class="fas fa-chevron-down collapse-icon"></i>
                     </div>
                     <div id="pads-container" class="pads-grid">
                         <!-- Pads generated dynamically -->
@@ -335,14 +409,10 @@
         <!-- Premium Loading Overlay -->
         <div id="loading-overlay" class="modal-overlay hidden">
             <div class="loading-content glass">
-                <div class="loading-visual">
-                    <div class="loading-ring"></div>
-                    <div class="loading-ring"></div>
-                    <div class="loading-ring"></div>
-                    <i class="fas fa-wave-square loading-icon"></i>
-                </div>
-                <h2 id="loading-title">Processing...</h2>
+                <p id="loading-percentage" style="font-size: 2.5rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.5rem; letter-spacing: -1px;">0%</p>
+                <h2 id="loading-title">Processing Slices</h2>
                 <p id="loading-subtitle">Optimizing your audio experience</p>
+                <p id="loading-time" style="margin-top: 1rem; color: var(--accent-primary); font-weight: 600; font-family: monospace;"></p>
                 <div class="loading-bar-container">
                     <div id="loading-bar" class="loading-bar"></div>
                 </div>

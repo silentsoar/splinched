@@ -21,6 +21,8 @@ const loadingOverlay = document.getElementById('loading-overlay');
 const loadingTitle = document.getElementById('loading-title');
 const loadingSubtitle = document.getElementById('loading-subtitle');
 const loadingBar = document.getElementById('loading-bar');
+const loadingTime = document.getElementById('loading-time');
+const loadingPercentage = document.getElementById('loading-percentage');
 
 const padsContainer = document.getElementById('pads-container');
 const btnPlayAll = document.getElementById('btn-play-all');
@@ -62,7 +64,24 @@ const valAdsrDeviation = document.getElementById('val-adsr-deviation');
 
 const btnRandRhythmic = document.getElementById('btn-rand-rhythmic');
 const btnRandMelodic = document.getElementById('btn-rand-melodic');
-const btnRandAlgo = document.getElementById('btn-rand-algo');
+const algoButtons = {
+    'Brownian': document.getElementById('btn-algo-brownian'),
+    'Intervallic': document.getElementById('btn-algo-intervallic'),
+    'Euclidean': document.getElementById('btn-algo-euclidean'),
+    'Harmonic': document.getElementById('btn-algo-harmonic'),
+    'Markov': document.getElementById('btn-algo-markov'),
+    'Stochastic': document.getElementById('btn-algo-stochastic'),
+    'Mirror': document.getElementById('btn-algo-mirror'),
+    'Pedal': document.getElementById('btn-algo-pedal'),
+    'Bitwise': document.getElementById('btn-algo-bitwise'),
+    'Cellular': document.getElementById('btn-algo-cellular'),
+    'Fibonacci': document.getElementById('btn-algo-fibonacci'),
+    'Anchor': document.getElementById('btn-algo-anchor'),
+    'Acid': document.getElementById('btn-algo-acid'),
+    'Phasing': document.getElementById('btn-algo-phasing'),
+    'Motif': document.getElementById('btn-algo-motif'),
+    'Pendulum': document.getElementById('btn-algo-pedalum')
+};
 const btnRerollSlices = document.getElementById('btn-reroll-slices');
 const btnSavePattern = document.getElementById('btn-save-pattern');
 const eucSteps = document.getElementById('euclidean-steps');
@@ -81,8 +100,26 @@ const filenameDisplay = document.getElementById('filename-display');
 const midiStatus = document.getElementById('midi-status');
 const autoKeyDisplay = document.getElementById('auto-key-display');
 const detectedKeyValue = document.getElementById('detected-key-value');
+
+const fxStrip = document.getElementById('effects-strip');
+const btnFxToggle = document.getElementById('btn-fx-toggle');
+const fxReverb = document.getElementById('fx-reverb');
+const fxDelay = document.getElementById('fx-delay');
+const fxDistort = document.getElementById('fx-distort');
+const fxEqLow = document.getElementById('fx-eq-low');
+const fxEqMid = document.getElementById('fx-eq-mid');
+const fxEqHigh = document.getElementById('fx-eq-high');
+
+const valReverb = document.getElementById('val-reverb');
+const valDelay = document.getElementById('val-delay');
+const valDistort = document.getElementById('val-distort');
+const valEqLow = document.getElementById('val-eq-low');
+const valEqMid = document.getElementById('val-eq-mid');
+const valEqHigh = document.getElementById('val-eq-high');
 const adsrCanvas = document.getElementById('adsr-visualizer');
 const adsrCtx = adsrCanvas ? adsrCanvas.getContext('2d') : null;
+const seqToneOnly = document.getElementById('seq-tone-only');
+const algoLenSelect = document.getElementById('algo-len');
 
 // Keyboard shortcut map
 const KEYS = [
@@ -463,6 +500,7 @@ function setupEventListeners() {
             engine.setActiveAlgorithm(algoSelect.value);
             renderPads();
             drawWaveform();
+            renderSequencerGrid();
             saveSettings();
         } finally {
             hideLoading();
@@ -512,11 +550,9 @@ function setupEventListeners() {
 
     // Sequencer changes
     patternSelect.addEventListener('change', () => {
+        const pat = SequencerPatterns.find(p => p.id == patternSelect.value);
+        engine.seqPattern = pat;
         renderSequencerGrid();
-        if (engine.seqIsPlaying) {
-            const pat = SequencerPatterns.find(p => p.id == patternSelect.value);
-            engine.seqPattern = pat;
-        }
         saveSettings();
     });
     
@@ -580,6 +616,10 @@ function setupEventListeners() {
         engine.kickLevel = val;
         saveSettings();
     });
+    seqToneOnly.addEventListener('change', (e) => {
+        engine.toneOnly = e.target.checked;
+        saveSettings();
+    });
 
     btnRandRhythmic.addEventListener('click', () => {
         const rhythmics = SequencerPatterns.filter(p => p.type === 'rhythmic');
@@ -597,66 +637,258 @@ function setupEventListeners() {
         patternSelect.dispatchEvent(new Event('change'));
     });
 
-    btnRandAlgo.addEventListener('click', () => {
+    Object.keys(algoButtons).forEach(strategy => {
+        algoButtons[strategy].addEventListener('click', () => generateAlgorithmicPattern(strategy));
+    });
+
+    function generateAlgorithmicPattern(strategy) {
         if (!engine.buffer || engine.slices.length === 0) return;
         
-        const len = 32;
+        const len = parseInt(algoLenSelect.value) || 32;
         const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode);
         
-        // Advanced Melodic Contour Generator
-        let currentIdx = Math.floor(validNotes.length / 2); 
-        let lastLeap = 0; 
-        const steps = [];
-        
-        for (let i = 0; i < len; i++) {
-            const isActive = Math.random() < engine.seqDensity;
-            if (isActive) {
-                let interval;
-                const r = Math.random();
-                
-                if (Math.abs(lastLeap) >= 3) {
-                    interval = lastLeap > 0 ? -1 - Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2);
-                    lastLeap = 0;
-                } else {
-                    if (r < 0.6) {
-                        interval = Math.floor(Math.random() * 5) - 2;
-                    } else if (r < 0.9) {
-                        interval = Math.random() > 0.5 ? 3 : -3;
-                        if (Math.random() > 0.5) interval += (interval > 0 ? 1 : -1);
-                        lastLeap = interval;
-                    } else {
-                        interval = Math.random() > 0.5 ? 7 : -7;
-                        lastLeap = interval;
-                    }
-                }
+        let steps = [];
+        const density = engine.seqDensity || 0.5;
 
-                currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + interval));
-                const center = Math.floor(validNotes.length / 2);
-                if (Math.abs(currentIdx - center) > 7 && Math.random() > 0.7) {
-                    currentIdx += (currentIdx > center ? -2 : 2);
-                }
-
-                const sliceId = Math.floor(Math.random() * engine.slices.length);
-                const slice = engine.slices[sliceId];
-                
-                let melodicOffset = 0;
+        // Helper to find the slice closest to a target scale index
+        const findBestSlice = (targetIdx) => {
+            const targetMidi = validNotes[targetIdx];
+            let bestSliceId = 0;
+            let minDiff = Infinity;
+            
+            engine.slices.forEach((slice, idx) => {
                 if (slice.pitch && slice.pitch.midi > 0) {
-                    const sliceBaseMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, engine.musicalKey, engine.musicalMode);
-                    const sliceBaseIdx = validNotes.indexOf(sliceBaseMidi);
-                    if (sliceBaseIdx !== -1) {
-                        melodicOffset = currentIdx - sliceBaseIdx;
+                    const diff = Math.abs(slice.pitch.midi - targetMidi);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        bestSliceId = idx;
                     }
                 }
-                
-                steps.push({ step: i, active: true, sliceId: sliceId, melodicOffset: melodicOffset });
-            } else {
-                steps.push({ step: i, active: false, sliceId: i % engine.slices.length });
+            });
+            return bestSliceId;
+        };
+
+        // Helper to get melodic offset for a given currentIdx and slice
+        const getOffset = (currentIdx, sliceId) => {
+            const slice = engine.slices[sliceId];
+            if (slice && slice.pitch && slice.pitch.midi > 0) {
+                const sliceBaseMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, engine.musicalKey, engine.musicalMode);
+                const sliceBaseIdx = validNotes.indexOf(sliceBaseMidi);
+                if (sliceBaseIdx !== -1) return currentIdx - sliceBaseIdx;
+            }
+            return 0;
+        };
+
+        if (strategy === 'Brownian') {
+            let currentIdx = Math.floor(validNotes.length / 2) - 7; 
+            let lastLeap = 0; 
+            for (let i = 0; i < len; i++) {
+                if (Math.random() < density) {
+                    let interval = (Math.abs(lastLeap) >= 3) ? (lastLeap > 0 ? -1 - Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2)) : (Math.random() < 0.6 ? Math.floor(Math.random() * 5) - 2 : (Math.random() > 0.5 ? 3 : -3));
+                    if (Math.abs(interval) >= 3) lastLeap = interval; else lastLeap = 0;
+                    currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + interval));
+                    const center = Math.floor(validNotes.length / 2) - 7;
+                    if (Math.abs(currentIdx - center) > 7 && Math.random() > 0.7) currentIdx += (currentIdx > center ? -2 : 2);
+                    
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Intervallic') {
+            let currentIdx = Math.floor(validNotes.length / 2) - 7;
+            for (let i = 0; i < len; i++) {
+                if (Math.random() < density) {
+                    const scaleJump = [1, 2, 4, 7][Math.floor(Math.random() * 4)] * (Math.random() > 0.5 ? 1 : -1);
+                    currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + scaleJump));
+                    
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Euclidean') {
+            const pulses = Math.max(1, Math.floor(len * density));
+            const rhythmicPattern = SequencerPatterns.generateEuclidean(len, pulses).steps;
+            const arpeggio = [0, 2, 4, 7, 9, 12]; 
+            let arpIdx = 0;
+            const rootIdx = Math.floor(validNotes.length / 2) - 14;
+            for (let i = 0; i < len; i++) {
+                if (rhythmicPattern[i].active) {
+                    const currentIdx = rootIdx + arpeggio[arpIdx % arpeggio.length];
+                    arpIdx++;
+                    
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Harmonic') {
+            const chordTones = [0, 2, 4]; 
+            const rootIdx = Math.floor(validNotes.length / 2) - 14;
+            for (let i = 0; i < len; i++) {
+                const isPulse = (i % 8 === 0 || i % 8 === 3 || i % 8 === 6);
+                if (isPulse && (Math.random() < density * 1.5)) {
+                    const currentIdx = rootIdx + chordTones[Math.floor(Math.random() * chordTones.length)] + (Math.floor(i / 8) * 2);
+                    
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Markov') {
+            let currentIdx = Math.floor(validNotes.length / 2) - 7;
+            let lastDir = 1;
+            for (let i = 0; i < len; i++) {
+                if (Math.random() < density) {
+                    const stayDir = Math.random() < 0.7;
+                    const dir = stayDir ? lastDir : -lastDir;
+                    const amount = [1, 1, 2, 3][Math.floor(Math.random() * 4)];
+                    currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + (dir * amount)));
+                    lastDir = dir;
+                    
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Stochastic') {
+            for (let i = 0; i < len; i++) {
+                if (Math.random() < density * 1.2) {
+                    const currentIdx = Math.floor(Math.random() * validNotes.length);
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Mirror') {
+            let halfSteps = [];
+            let currentIdx = Math.floor(validNotes.length / 2) - 7;
+            for (let i = 0; i < len / 2; i++) {
+                if (Math.random() < density) {
+                    currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + Math.floor(Math.random() * 5) - 2));
+                    halfSteps.push({ active: true, idx: currentIdx });
+                } else halfSteps.push({ active: false });
+            }
+            for (let i = 0; i < len; i++) {
+                const isSecondHalf = i >= len / 2;
+                const source = isSecondHalf ? halfSteps[len - 1 - i] : halfSteps[i];
+                if (source.active) {
+                    const sliceId = findBestSlice(source.idx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(source.idx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Pedal') {
+            const rootIdx = Math.floor(validNotes.length / 2) - 14;
+            let currentIdx = rootIdx + 7;
+            for (let i = 0; i < len; i++) {
+                const isPedal = i % 2 === 0;
+                if (Math.random() < density * 1.2) {
+                    const targetIdx = isPedal ? rootIdx : (currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + Math.floor(Math.random() * 3) - 1)));
+                    const sliceId = findBestSlice(targetIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(targetIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Bitwise') {
+            const rootIdx = Math.floor(validNotes.length / 2) - 14;
+            for (let i = 0; i < len; i++) {
+                const isActive = ((i & (i >> 2)) % 3 === 0) && (Math.random() < density * 1.5);
+                if (isActive) {
+                    const currentIdx = rootIdx + ((i ^ (i >> 3)) % 12);
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Cellular') {
+            const rootIdx = Math.floor(validNotes.length / 2) - 14;
+            let row = new Array(len).fill(0);
+            row[Math.floor(len / 2)] = 1;
+            const nextRow = (r) => {
+                let nr = new Array(len).fill(0);
+                for (let j = 0; j < len; j++) {
+                    const left = r[(j - 1 + len) % len];
+                    const self = r[j];
+                    const right = r[(j + 1) % len];
+                    const rule = (left << 2) | (self << 1) | right;
+                    if ([1, 2, 3, 4].includes(rule)) nr[j] = 1; // Simplified Rule 30-ish
+                }
+                return nr;
+            };
+            for (let i = 0; i < len; i++) {
+                if (row[i] && Math.random() < density * 1.2) {
+                    const currentIdx = rootIdx + (i % 14);
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+                row = nextRow(row);
+            }
+        } else if (strategy === 'Fibonacci') {
+            const rootIdx = Math.floor(validNotes.length / 2) - 7;
+            let a = 1, b = 1;
+            for (let i = 0; i < len; i++) {
+                const isActive = Math.random() < density;
+                if (isActive) {
+                    const currentIdx = rootIdx + (b % 12);
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+                let temp = a + b; a = b; b = temp;
+            }
+        } else if (strategy === 'Anchor') {
+            const rootIdx = Math.floor(validNotes.length / 2) - 14;
+            for (let i = 0; i < len; i++) {
+                if (Math.random() < density) {
+                    const currentIdx = rootIdx + (Math.random() < 0.8 ? 0 : (Math.random() < 0.5 ? 7 : 12));
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Acid') {
+            const rootIdx = Math.floor(validNotes.length / 2) - 14;
+            let currentIdx = rootIdx + 7;
+            let runLeft = 0;
+            let dir = 1;
+            for (let i = 0; i < len; i++) {
+                if (runLeft <= 0) {
+                    runLeft = [4, 6, 8][Math.floor(Math.random() * 3)];
+                    dir = Math.random() > 0.5 ? 1 : -1;
+                }
+                if (Math.random() < density * 1.5) {
+                    currentIdx = Math.max(rootIdx, Math.min(rootIdx + 24, currentIdx + dir));
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+                runLeft--;
+            }
+        } else if (strategy === 'Phasing') {
+            const rootIdx = Math.floor(validNotes.length / 2) - 14;
+            const motif = [0, 2, 4, 7, 9].map(n => rootIdx + n);
+            for (let i = 0; i < len; i++) {
+                if (Math.random() < density) {
+                    const currentIdx = motif[(i + Math.floor(i / 8)) % motif.length];
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Motif') {
+            const rootIdx = Math.floor(validNotes.length / 2) - 7;
+            let boxBase = rootIdx;
+            for (let i = 0; i < len; i++) {
+                if (i % 8 === 0) boxBase += (Math.random() > 0.5 ? 2 : -2);
+                if (Math.random() < density) {
+                    const currentIdx = boxBase + Math.floor(Math.random() * 5);
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
+            }
+        } else if (strategy === 'Pendulum') {
+            const rootIdx = Math.floor(validNotes.length / 2) - 7;
+            for (let i = 0; i < len; i++) {
+                if (Math.random() < density) {
+                    const currentIdx = rootIdx + Math.round(Math.sin(i * 0.5) * 7);
+                    const sliceId = findBestSlice(currentIdx);
+                    steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                } else steps.push({ step: i, active: false });
             }
         }
         
         const newPat = {
             id: 'algo_' + Date.now(),
-            name: 'Algorithmic ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
+            name: strategy + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
             type: 'melodic',
             length: len,
             steps: steps,
@@ -666,10 +898,11 @@ function setupEventListeners() {
         SequencerPatterns.push(newPat);
         saveCustomPatterns();
         populatePatterns();
-        
         patternSelect.value = newPat.id;
-        patternSelect.dispatchEvent(new Event('change'));
-    });
+        engine.seqPattern = newPat;
+        renderSequencerGrid();
+        saveSettings();
+    }
 
     btnRerollSlices.addEventListener('click', () => {
         const pat = SequencerPatterns.find(p => p.id == patternSelect.value);
@@ -846,26 +1079,6 @@ function setupEventListeners() {
             }
         });
     }
-
-    // Collapsible Sections
-    document.querySelectorAll('.section-header').forEach(header => {
-        header.addEventListener('click', (e) => {
-            // Don't collapse if clicking a button inside the header
-            if (e.target.closest('button')) return;
-
-            const panel = header.closest('.panel');
-            if (panel) {
-                panel.classList.toggle('collapsed');
-                
-                // If expanding, ensure canvases are redrawn correctly
-                if (!panel.classList.contains('collapsed')) {
-                    handleResize();
-                    if (typeof drawWaveform === 'function') drawWaveform();
-                    if (typeof drawAdsrCurve === 'function') drawAdsrCurve();
-                }
-            }
-        });
-    });
 }
 
 // --- Audio Loading & Processing ---
@@ -904,15 +1117,38 @@ async function processAudio() {
     if (!engine.buffer) return;
     
     showLoading('Processing Slices', 'Identifying pitch and applying algorithms...');
+    if (loadingTime) loadingTime.textContent = 'Starting...';
+    if (loadingBar) loadingBar.style.width = '0%';
+    if (loadingPercentage) loadingPercentage.textContent = '0%';
     
     // Use setTimeout to allow the browser to render the loading overlay before heavy processing
     await new Promise(resolve => setTimeout(resolve, 50));
+
+    const startTime = Date.now();
+    let totalProcessed = 0;
+    const slicesCount = parseInt(targetSlicesSelect.value);
+    // Rough estimate of total slices across all 6 algorithms
+    const estimatedTotal = slicesCount * 6;
+
+    engine.onProgress = (current, total) => {
+        totalProcessed++;
+        const progress = Math.min(100, (totalProcessed / estimatedTotal) * 100);
+        if (loadingBar) loadingBar.style.width = `${progress}%`;
+        if (loadingPercentage) loadingPercentage.textContent = `${Math.round(progress)}%`;
+        
+        if (totalProcessed > 5) {
+            const elapsed = (Date.now() - startTime) / 1000;
+            const timePerSlice = elapsed / totalProcessed;
+            const remaining = Math.max(0, timePerSlice * (estimatedTotal - totalProcessed));
+            if (loadingTime) loadingTime.textContent = `EST: ${remaining.toFixed(1)}s`;
+        }
+    };
 
     try {
         const algo = algoSelect.value;
         const slices = parseInt(targetSlicesSelect.value);
 
-        engine.processAllAlgorithms(slices);
+        await engine.processAllAlgorithms(slices);
         engine.setActiveAlgorithm(algo);
 
         renderPads();
@@ -932,8 +1168,10 @@ async function processAudio() {
             engine.setMusicalConfig(detection.key, detection.mode, octaveSelect.value);
         }
 
+        if (loadingTime) loadingTime.textContent = 'Finalizing...';
         saveSettings();
         drawAdsrCurve();
+        renderSequencerGrid();
     } finally {
         hideLoading();
     }
@@ -956,6 +1194,11 @@ function renderSequencerGrid() {
         const stepEl = document.createElement('div');
         stepEl.className = 'seq-step';
         stepEl.id = `seq-step-${i}`;
+        
+        // Preserve playing state if active
+        if (engine.seqIsPlaying && engine.seqCurrentStep === i) {
+            stepEl.classList.add('playing');
+        }
         
         const baseStepData = pattern.steps[i];
         const stepData = maskedPattern && maskedPattern.length > i ? maskedPattern[i] : baseStepData;
@@ -1442,7 +1685,8 @@ function saveSettings() {
         probability: seqProbability.value,
         swing: seqSwing.value,
         kick: kickDrum.checked,
-        kickLevel: kickLevel.value
+        kickLevel: kickLevel.value,
+        toneOnly: seqToneOnly.checked
     };
     localStorage.setItem('splinchedSettings', JSON.stringify(settings));
 }
@@ -1492,6 +1736,7 @@ function loadSettings() {
             if (settings.kick !== undefined) kickDrum.checked = settings.kick;
             if (settings.kickLevel !== undefined) kickLevel.value = fromLogPercent(settings.kickLevel);
             else kickLevel.value = fromLogPercent(0.3);
+            if (settings.toneOnly !== undefined) seqToneOnly.checked = settings.toneOnly;
             
             // Dispatch events to update UI text visually
             const e = new Event('input');
@@ -1513,6 +1758,8 @@ function loadSettings() {
             engine.setMusicalConfig(keySelect.value, modeSelect.value, octaveSelect.value);
             engine.globalChoke = globalChokeCheckbox.checked;
             engine.kickEnabled = kickDrum.checked;
+            engine.toneOnly = seqToneOnly.checked;
+            engine.seqPattern = SequencerPatterns.find(p => p.id == patternSelect.value);
         } catch(e) {}
     } else {
         // Apply fresh defaults
@@ -1537,6 +1784,7 @@ function loadSettings() {
             }
         });
         drawAdsrCurve();
+        engine.seqPattern = SequencerPatterns.find(p => p.id == patternSelect.value);
     }
 }
 
@@ -1590,6 +1838,70 @@ function loadAudioFromDB() {
             }
         };
         req.onerror = () => resolve(null);
+    });
+}
+
+// --- Effects Listeners ---
+if (btnFxToggle) {
+    btnFxToggle.addEventListener('click', () => {
+        engine.fxEnabled = !engine.fxEnabled;
+        btnFxToggle.classList.toggle('active', engine.fxEnabled);
+        fxStrip.style.opacity = engine.fxEnabled ? '1' : '0.5';
+        btnFxToggle.style.background = engine.fxEnabled ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)';
+    });
+}
+if (fxReverb) {
+    fxReverb.addEventListener('input', (e) => {
+        let val = parseFloat(e.target.value);
+        if (val < 0.05) { val = 0; e.target.value = 0; }
+        engine.updateEffects({ reverb: val });
+        valReverb.textContent = Math.round(val * 100) + '%';
+        e.target.classList.toggle('is-default', val === 0);
+    });
+}
+if (fxDelay) {
+    fxDelay.addEventListener('input', (e) => {
+        let val = parseFloat(e.target.value);
+        if (val < 0.05) { val = 0; e.target.value = 0; }
+        engine.updateEffects({ delay: val });
+        valDelay.textContent = Math.round(val * 100) + '%';
+        e.target.classList.toggle('is-default', val === 0);
+    });
+}
+if (fxDistort) {
+    fxDistort.addEventListener('input', (e) => {
+        let val = parseFloat(e.target.value);
+        if (val < 0.05) { val = 0; e.target.value = 0; }
+        engine.updateEffects({ distort: val });
+        valDistort.textContent = Math.round(val * 100) + '%';
+        e.target.classList.toggle('is-default', val === 0);
+    });
+}
+if (fxEqLow) {
+    fxEqLow.addEventListener('input', (e) => {
+        let val = parseInt(e.target.value);
+        if (Math.abs(val) < 1.5) { val = 0; e.target.value = 0; }
+        engine.updateEffects({ eqLow: val });
+        valEqLow.textContent = val + 'dB';
+        e.target.classList.toggle('is-default', val === 0);
+    });
+}
+if (fxEqMid) {
+    fxEqMid.addEventListener('input', (e) => {
+        let val = parseInt(e.target.value);
+        if (Math.abs(val) < 1.5) { val = 0; e.target.value = 0; }
+        engine.updateEffects({ eqMid: val });
+        valEqMid.textContent = val + 'dB';
+        e.target.classList.toggle('is-default', val === 0);
+    });
+}
+if (fxEqHigh) {
+    fxEqHigh.addEventListener('input', (e) => {
+        let val = parseInt(e.target.value);
+        if (Math.abs(val) < 1.5) { val = 0; e.target.value = 0; }
+        engine.updateEffects({ eqHigh: val });
+        valEqHigh.textContent = val + 'dB';
+        e.target.classList.toggle('is-default', val === 0);
     });
 }
 

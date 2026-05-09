@@ -32,8 +32,15 @@ class PitchDetector {
         buffer = buffer.slice(r1, r2);
         size = buffer.length;
 
-        let c = new Array(size).fill(0);
-        for (let i = 0; i < size; i++) {
+        // Optimization: Only check lags corresponding to musical frequencies (20Hz to 4000Hz)
+        // This avoids calculating billions of unnecessary correlations.
+        const minFreq = 20;
+        const maxFreq = 4000;
+        const maxLag = Math.min(size - 2, Math.floor(sampleRate / minFreq));
+        const minLag = Math.floor(sampleRate / maxFreq);
+
+        let c = new Array(maxLag + 2).fill(0);
+        for (let i = 0; i < maxLag + 1; i++) {
             for (let j = 0; j < size - i; j++) {
                 c[i] = c[i] + buffer[j] * buffer[j + i];
             }
@@ -41,15 +48,19 @@ class PitchDetector {
 
         let d = 0; while (c[d] > c[d + 1]) d++;
         let maxval = -1, maxpos = -1;
-        for (let i = d; i < size; i++) {
+        // Search for peak within the musical range
+        for (let i = Math.max(d, minLag); i < maxLag; i++) {
             if (c[i] > maxval) {
                 maxval = c[i];
                 maxpos = i;
             }
         }
+        
+        if (maxpos === -1) return -1;
+        
         let T0 = maxpos;
         
-        // Parabolic interpolation
+        // Parabolic interpolation for sub-sample precision
         let x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
         let a = (x1 + x3 - 2 * x2) / 2;
         let b = (x3 - x1) / 2;
@@ -72,8 +83,8 @@ class PitchDetector {
     }
 
     static analyzeSlice(audioBuffer, startOffset, endOffset) {
-        // Limit pitch analysis to the first 4096 samples to prevent UI stalling on large slices
-        const MAX_SAMPLES = 4096;
+        // Limit pitch analysis to the first 8192 samples to improve accuracy for lower frequencies
+        const MAX_SAMPLES = 8192;
         const length = Math.min(endOffset - startOffset, MAX_SAMPLES);
         
         const data = audioBuffer.getChannelData(0).slice(startOffset, startOffset + length);

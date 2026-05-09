@@ -47,6 +47,99 @@ class AudioEngine {
         this.allSlices = {};
         this.activeAlgo = 'transient';
         this.padMapping = Array.from({length: 16}, (_, i) => i);
+        this.toneOnly = false;
+        this._cachedMaskedPattern = null;
+        this._lastMaskParams = "";
+
+        this.fxEnabled = true;
+        this._setupEffects();
+    }
+
+    _setupEffects() {
+        // 1. EQ Nodes
+        this.eqLow = this.ctx.createBiquadFilter();
+        this.eqLow.type = 'lowshelf';
+        this.eqLow.frequency.value = 320;
+
+        this.eqMid = this.ctx.createBiquadFilter();
+        this.eqMid.type = 'peaking';
+        this.eqMid.frequency.value = 1000;
+        this.eqMid.Q.value = 1;
+
+        this.eqHigh = this.ctx.createBiquadFilter();
+        this.eqHigh.type = 'highshelf';
+        this.eqHigh.frequency.value = 3200;
+
+        // 2. Distortion
+        this.distortion = this.ctx.createWaveShaper();
+        this.distortion.curve = this._makeDistortionCurve(0);
+        this.distortion.oversample = '4x';
+
+        // 3. Delay
+        this.delay = this.ctx.createDelay(1.0);
+        this.delay.delayTime.value = 0.25;
+        this.delayFeedback = this.ctx.createGain();
+        this.delayFeedback.gain.value = 0.3;
+        this.delayGain = this.ctx.createGain();
+        this.delayGain.gain.value = 0;
+
+        // 4. Reverb
+        this.reverb = this.ctx.createConvolver();
+        this.reverb.buffer = this._generateReverbImpulse(1.5, 2.0);
+        this.reverbGain = this.ctx.createGain();
+        this.reverbGain.gain.value = 0;
+
+        // 5. Routing
+        // Source -> EQ Low -> EQ Mid -> EQ High -> Distortion -> Output
+        this.eqLow.connect(this.eqMid);
+        this.eqMid.connect(this.eqHigh);
+        this.eqHigh.connect(this.distortion);
+        this.distortion.connect(this.globalGain);
+
+        // Parallel Routing for Delay/Reverb
+        this.distortion.connect(this.delay);
+        this.delay.connect(this.delayFeedback);
+        this.delayFeedback.connect(this.delay);
+        this.delay.connect(this.delayGain);
+        this.delayGain.connect(this.globalGain);
+
+        this.distortion.connect(this.reverb);
+        this.reverb.connect(this.reverbGain);
+        this.reverbGain.connect(this.globalGain);
+    }
+
+    _makeDistortionCurve(amount) {
+        const k = typeof amount === 'number' ? amount : 50;
+        const n_samples = 44100;
+        const curve = new Float32Array(n_samples);
+        const deg = Math.PI / 180;
+        for (let i = 0; i < n_samples; ++i) {
+            const x = (i * 2) / n_samples - 1;
+            curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+        }
+        return curve;
+    }
+
+    _generateReverbImpulse(duration, decay) {
+        const sampleRate = this.ctx.sampleRate;
+        const length = sampleRate * duration;
+        const impulse = this.ctx.createBuffer(2, length, sampleRate);
+        for (let i = 0; i < 2; i++) {
+            const channelData = impulse.getChannelData(i);
+            for (let j = 0; j < length; j++) {
+                channelData[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / length, decay);
+            }
+        }
+        return impulse;
+    }
+
+    updateEffects(params) {
+        if (params.reverb !== undefined) this.reverbGain.gain.setTargetAtTime(params.reverb, this.ctx.currentTime, 0.05);
+        if (params.delay !== undefined) this.delayGain.gain.setTargetAtTime(params.delay, this.ctx.currentTime, 0.05);
+        if (params.distort !== undefined) this.distortion.curve = this._makeDistortionCurve(params.distort * 100);
+        if (params.eqLow !== undefined) this.eqLow.gain.setTargetAtTime(params.eqLow, this.ctx.currentTime, 0.05);
+        if (params.eqMid !== undefined) this.eqMid.gain.setTargetAtTime(params.eqMid, this.ctx.currentTime, 0.05);
+        if (params.eqHigh !== undefined) this.eqHigh.gain.setTargetAtTime(params.eqHigh, this.ctx.currentTime, 0.05);
     }
 
     async loadAudio(arrayBuffer) {
@@ -63,14 +156,14 @@ class AudioEngine {
 
     // --- Slicing Algorithms ---
 
-    processAllAlgorithms(targetSlices) {
+    async processAllAlgorithms(targetSlices) {
         if (!this.buffer) return;
-        this.allSlices['grid'] = this.chopGrid(targetSlices);
-        this.allSlices['transient'] = this.chopTransient(targetSlices);
-        this.allSlices['random'] = this.chopRandom(targetSlices);
-        this.allSlices['silence'] = this.chopSilence(targetSlices);
-        this.allSlices['beatsync'] = this.chopBeatSync(targetSlices);
-        this.allSlices['golden'] = this.chopGolden(targetSlices);
+        this.allSlices['grid'] = await this.chopGrid(targetSlices);
+        this.allSlices['transient'] = await this.chopTransient(targetSlices);
+        this.allSlices['random'] = await this.chopRandom(targetSlices);
+        this.allSlices['silence'] = await this.chopSilence(targetSlices);
+        this.allSlices['beatsync'] = await this.chopBeatSync(targetSlices);
+        this.allSlices['golden'] = await this.chopGolden(targetSlices);
         this.padMapping = Array.from({length: 16}, (_, i) => i);
     }
 
@@ -81,10 +174,9 @@ class AudioEngine {
         }
     }
 
-    _finalizeSlices(cuts, targetSlices) {
+    async _finalizeSlices(cuts, targetSlices) {
         // Enforce target slices limit roughly
         if (cuts.length > targetSlices + 1) {
-            // Keep first, last, and evenly distribute the rest
             const step = (cuts.length - 2) / (targetSlices - 1);
             let newCuts = [cuts[0]];
             for(let i=1; i<targetSlices; i++) {
@@ -111,30 +203,39 @@ class AudioEngine {
                 duration: end - start,
                 pitch: pitch
             });
+
+            if (this.onProgress) {
+                this.onProgress(i + 1, cuts.length - 1);
+            }
+
+            // Yield to main thread every 16 slices to prevent "Page Unresponsive" modal
+            if (i > 0 && i % 16 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
         }
         return this.slices;
     }
 
-    chopGrid(targetSlices) {
+    async chopGrid(targetSlices) {
         if (!this.buffer) return [];
         const dur = this.buffer.duration;
         let cuts = [];
         for (let i = 0; i <= targetSlices; i++) {
             cuts.push((i / targetSlices) * dur);
         }
-        return this._finalizeSlices(cuts, targetSlices);
+        return await this._finalizeSlices(cuts, targetSlices);
     }
 
-    chopRandom(targetSlices) {
+    async chopRandom(targetSlices) {
         if (!this.buffer) return [];
         const dur = this.buffer.duration;
         let cuts = [0, dur];
         for (let i = 0; i < targetSlices - 1; i++) cuts.push(Math.random() * dur);
         cuts.sort((a,b) => a-b);
-        return this._finalizeSlices(cuts, targetSlices);
+        return await this._finalizeSlices(cuts, targetSlices);
     }
 
-    chopTransient(targetSlices) {
+    async chopTransient(targetSlices) {
         if (!this.buffer) return [];
         const data = this.buffer.getChannelData(0);
         const sr = this.buffer.sampleRate;
@@ -153,10 +254,10 @@ class AudioEngine {
             }
         }
         cuts.push(dur);
-        return this._finalizeSlices(cuts, targetSlices);
+        return await this._finalizeSlices(cuts, targetSlices);
     }
 
-    chopSilence(targetSlices) {
+    async chopSilence(targetSlices) {
         if (!this.buffer) return [];
         const data = this.buffer.getChannelData(0);
         const sr = this.buffer.sampleRate;
@@ -176,10 +277,10 @@ class AudioEngine {
         }
         cuts.push(dur);
         cuts.sort((a,b)=>a-b);
-        return this._finalizeSlices(cuts, targetSlices);
+        return await this._finalizeSlices(cuts, targetSlices);
     }
 
-    chopBeatSync(targetSlices) {
+    async chopBeatSync(targetSlices) {
         // Assume 120 BPM for now if not analyzed
         if (!this.buffer) return [];
         const dur = this.buffer.duration;
@@ -188,10 +289,10 @@ class AudioEngine {
         let cuts = [];
         for(let t=0; t<dur; t+=beatDur) cuts.push(t);
         if(cuts[cuts.length-1] !== dur) cuts.push(dur);
-        return this._finalizeSlices(cuts, targetSlices);
+        return await this._finalizeSlices(cuts, targetSlices);
     }
 
-    chopGolden(targetSlices) {
+    async chopGolden(targetSlices) {
         if (!this.buffer) return [];
         const dur = this.buffer.duration;
         let cuts = [0, dur];
@@ -207,7 +308,7 @@ class AudioEngine {
             queue.push({start: cutPoint, end: seg.end});
         }
         cuts.sort((a,b)=>a-b);
-        return this._finalizeSlices(cuts, targetSlices);
+        return await this._finalizeSlices(cuts, targetSlices);
     }
 
     // --- Playback & Sequencer ---
@@ -219,7 +320,8 @@ class AudioEngine {
         this.activeSources.clear();
     }
 
-    _createSource(sliceId, time, playbackRate = 1.0, ctx = this.ctx, destination = this.globalGain) {
+    _createSource(sliceId, time, playbackRate = 1.0, ctx = this.ctx, destination = null) {
+        const dest = destination || (this.fxEnabled ? this.eqLow : this.globalGain);
         const slice = this.slices.find(s => s.id === sliceId);
         if (!slice || !this.buffer) return null;
 
@@ -240,7 +342,6 @@ class AudioEngine {
         let R = this.adsr.release;
 
         if (this.adsrDeviation !== 0) {
-            // Deviate between 0 and X, where X is adsrDeviation
             const mult = 1.0 + (Math.random() * this.adsrDeviation);
             A *= Math.max(0.001, mult);
             D *= Math.max(0.001, mult);
@@ -281,7 +382,7 @@ class AudioEngine {
         gainNode.gain.linearRampToValueAtTime(0.0001, releaseEndTime);
 
         source.connect(gainNode);
-        gainNode.connect(destination);
+        gainNode.connect(dest);
 
         const playId = Math.random().toString(36).substr(2, 9);
         
@@ -303,6 +404,76 @@ class AudioEngine {
         return source;
     }
 
+    _createTone(midiNote, time, holdDur = 0.2, ctx = this.ctx, destination = null) {
+        const dest = destination || (this.fxEnabled ? this.eqLow : this.globalGain);
+        if (midiNote < 0) return null;
+        
+        const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+        
+        if (this.globalChoke && ctx === this.ctx) {
+            this.stopAllNodes();
+        }
+
+        // We use a combination of Triangle and Sine for a "lo-fi piano" feel
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, time);
+
+        const gainNode = ctx.createGain();
+        
+        // ADSR Envelope
+        let A = this.adsr.attack;
+        let D = this.adsr.decay;
+        const S = this.adsr.sustain;
+        let R = this.adsr.release;
+
+        if (this.adsrDeviation !== 0) {
+            const mult = 1.0 + (Math.random() * this.adsrDeviation);
+            A *= Math.max(0.001, mult);
+            D *= Math.max(0.001, mult);
+            R *= Math.max(0.001, mult);
+        }
+
+        let audibleDur = holdDur + R;
+        if (S <= 0.001) {
+            audibleDur = Math.min(holdDur, A + D);
+        }
+
+        gainNode.gain.setValueAtTime(0, time);
+        
+        // Attack
+        let peakTime = time + A;
+        if (peakTime > time + holdDur) peakTime = time + holdDur;
+        gainNode.gain.linearRampToValueAtTime(0.7, peakTime);
+        
+        // Decay
+        let decayEndTime = peakTime + D;
+        if (decayEndTime > time + holdDur) decayEndTime = time + holdDur;
+        gainNode.gain.linearRampToValueAtTime(S * 0.7, decayEndTime);
+        
+        // Sustain
+        gainNode.gain.setValueAtTime(S * 0.7, time + holdDur);
+        
+        // Release
+        const releaseEndTime = time + holdDur + R;
+        gainNode.gain.linearRampToValueAtTime(0.0001, releaseEndTime);
+
+        osc.connect(gainNode);
+        gainNode.connect(dest);
+
+        if (ctx === this.ctx) {
+            this.activeSources.add(osc);
+            osc.onended = () => {
+                this.activeSources.delete(osc);
+            };
+        }
+
+        osc.start(time);
+        osc.stop(releaseEndTime);
+        
+        return osc;
+    }
+
     playPad(sliceId, midiNoteOverride = -1) {
         if(this.ctx.state === 'suspended') this.ctx.resume();
         const slice = this.slices.find(s => s.id === sliceId);
@@ -314,7 +485,11 @@ class AudioEngine {
             rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, midiNoteOverride);
         }
 
-        this._createSource(sliceId, this.ctx.currentTime, rate);
+        if (this.toneOnly && slice.pitch.midi > 0) {
+            this._createTone(slice.pitch.midi, this.ctx.currentTime);
+        } else {
+            this._createSource(sliceId, this.ctx.currentTime, rate);
+        }
     }
 
     // --- Scheduler ---
@@ -343,8 +518,15 @@ class AudioEngine {
         }
     }
 
-    getMaskedPattern() {
+    getMaskedPattern(forceRegenerate = false) {
         if (!this.seqPattern || !this.seqPattern.steps) return [];
+        
+        const currentParams = `${this.seqPattern.id}_${this.seqPattern.steps.length}_${this.seqDensity}_${this.seqSyncopation}_${this.seqProbability}_${this.seqNoteRepeat}_${this.seqMicroTiming}`;
+        
+        if (!forceRegenerate && this._cachedMaskedPattern && this._lastMaskParams === currentParams) {
+            return this._cachedMaskedPattern;
+        }
+
         const pattern = this.seqPattern;
         const N = pattern.steps.length;
         const density = this.seqDensity;
@@ -424,6 +606,8 @@ class AudioEngine {
         });
         
         this.lastMaskedPattern = maskedSteps;
+        this._cachedMaskedPattern = maskedSteps;
+        this._lastMaskParams = currentParams;
         return maskedSteps;
     }
 
@@ -500,7 +684,23 @@ class AudioEngine {
         
         for (let r = 0; r < ratchets; r++) {
             let t = time + (r * ratchetSpacing);
-            this._createSource(sliceId, t, rate);
+            
+            if (this.toneOnly && slice.pitch.midi > 0) {
+                // Determine the target MIDI note
+                let targetMidi = slice.pitch.midi;
+                if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
+                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
+                    const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                    let idx = validNotes.indexOf(closestMidi);
+                    if (idx !== -1) {
+                        idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                        targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                    }
+                }
+                this._createTone(targetMidi, t, ratchetSpacing);
+            } else {
+                this._createSource(sliceId, t, rate);
+            }
         }
     }
 
@@ -513,6 +713,9 @@ class AudioEngine {
             this.seqTimerID = setTimeout(() => this._scheduler(), this.seqLookahead);
         }
     }
+
+    // --- Effects Listeners ---
+    // Note: The logic for toggling engine.fxEnabled and UI updates is handled in the app controller.
 
     // --- Offline Render ---
     
@@ -570,7 +773,22 @@ class AudioEngine {
                 
                 for (let r = 0; r < ratchets; r++) {
                     let t = time + (r * ratchetSpacing);
-                    this._createSource(sliceId, t, rate, offlineCtx, offlineCtx.destination);
+                    
+                    if (this.toneOnly && slice.pitch.midi > 0) {
+                        let targetMidi = slice.pitch.midi;
+                        if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
+                            const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
+                            const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                            let idx = validNotes.indexOf(closestMidi);
+                            if (idx !== -1) {
+                                idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                                targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                            }
+                        }
+                        this._createTone(targetMidi, t, ratchetSpacing, offlineCtx, offlineCtx.destination);
+                    } else {
+                        this._createSource(sliceId, t, rate, offlineCtx, offlineCtx.destination);
+                    }
                 }
             }
             baseTime += 0.25 * secondsPerBeat;
