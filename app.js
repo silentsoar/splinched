@@ -25,8 +25,7 @@ const loadingTime = document.getElementById('loading-time');
 const loadingPercentage = document.getElementById('loading-percentage');
 
 const padsContainer = document.getElementById('pads-container');
-const btnPlayAll = document.getElementById('btn-play-all');
-const btnStopAll = document.getElementById('btn-stop-all');
+const btnTogglePlayAll = document.getElementById('btn-toggle-play-all');
 
 const algoSelect = document.getElementById('algorithm-select');
 const targetSlicesSelect = document.getElementById('target-slices');
@@ -86,8 +85,7 @@ const algoButtons = {
 const kickLevel = document.getElementById('kick-level');
 const valKick = document.getElementById('val-kick');
 
-const btnSeqPlay = document.getElementById('btn-seq-play');
-const btnSeqStop = document.getElementById('btn-seq-stop');
+const btnToggleSeq = document.getElementById('btn-toggle-seq');
 const seqGrid = document.getElementById('seq-grid');
 
 const btnExportSeq = document.getElementById('btn-export-seq');
@@ -180,8 +178,8 @@ const SLIDER_DEFAULTS = {
     'adsr-s': fromLog(0),
     'adsr-r': fromLog(80),
     'seq-density': fromLogPercent(0.5),
-    'seq-syncopation': 30,
-    'seq-note-repeat': 30,
+    'seq-syncopation': fromLogPercent(0.15),
+    'seq-note-repeat': fromLogPercent(0.15),
     'seq-micro-timing': 0,
     'seq-probability': 100,
     'seq-swing': 0,
@@ -302,6 +300,7 @@ function animatePlayhead(startTime, duration, offset = 0, rate = 1.0) {
         if (currentBufferTime >= offset + duration || currentBufferTime >= totalDur) {
             playheadEl.style.display = 'none';
             playheadAnimId = null;
+            updatePlayIcons();
             return;
         }
         
@@ -313,6 +312,27 @@ function animatePlayhead(startTime, duration, offset = 0, rate = 1.0) {
     if (playheadAnimId) cancelAnimationFrame(playheadAnimId);
     anim();
 }
+
+function updatePlayIcons() {
+    if (btnTogglePlayAll) {
+        const icon = btnTogglePlayAll.querySelector('i');
+        if (mainPlaybackSource) {
+            icon.className = 'fas fa-stop';
+        } else {
+            icon.className = 'fas fa-play';
+        }
+    }
+    if (btnToggleSeq) {
+        const icon = btnToggleSeq.querySelector('i');
+        if (engine.seqIsPlaying) {
+            icon.className = 'fas fa-stop';
+        } else {
+            icon.className = 'fas fa-play';
+        }
+    }
+}
+
+let mainPlaybackSource = null;
 
 engine.onPlayheadStart = (offset, duration, rate, sliceId, playId) => {
     animatePlayhead(engine.ctx.currentTime, duration, offset, rate);
@@ -375,12 +395,13 @@ async function init() {
 
 
 
-    // Sync audio engine sequencer with UI grid
     engine.onStepPlay = (stepNumber) => {
         document.querySelectorAll('.seq-step').forEach(el => el.classList.remove('playing'));
         const stepEl = document.getElementById(`seq-step-${stepNumber}`);
         if (stepEl) stepEl.classList.add('playing');
+        updatePlayIcons();
     };
+    updatePlayIcons();
 }
 
 function populatePatterns(preserveSelection = false) {
@@ -465,28 +486,28 @@ function setupEventListeners() {
     btnStopRecord.addEventListener('click', stopRecording);
 
     // Playback
-    let mainPlaybackSource = null;
-
-    btnPlayAll.addEventListener('click', () => {
-        if(engine.ctx.state === 'suspended') engine.ctx.resume();
+    btnTogglePlayAll.addEventListener('click', () => {
+        if (engine.ctx.state === 'suspended') engine.ctx.resume();
+        
         if (mainPlaybackSource) {
-            try { mainPlaybackSource.stop(); } catch(e) {}
-        }
-        mainPlaybackSource = engine.ctx.createBufferSource();
-        mainPlaybackSource.buffer = engine.buffer;
-        mainPlaybackSource.connect(engine.globalGain);
-        mainPlaybackSource.start(0);
-        animatePlayhead(engine.ctx.currentTime, engine.buffer.duration, 0, 1.0);
-    });
-    btnStopAll.addEventListener('click', () => {
-        engine.stopSequencer();
-        engine.stopAllNodes();
-        if (mainPlaybackSource) {
+            // Stop
             try { mainPlaybackSource.stop(); } catch(e) {}
             mainPlaybackSource = null;
+            if (playheadAnimId) { cancelAnimationFrame(playheadAnimId); playheadAnimId = null; }
+            if (playheadEl) playheadEl.style.display = 'none';
+        } else {
+            // Play
+            mainPlaybackSource = engine.ctx.createBufferSource();
+            mainPlaybackSource.buffer = engine.buffer;
+            mainPlaybackSource.connect(engine.globalGain);
+            mainPlaybackSource.onended = () => {
+                mainPlaybackSource = null;
+                updatePlayIcons();
+            };
+            mainPlaybackSource.start(0);
+            animatePlayhead(engine.ctx.currentTime, engine.buffer.duration, 0, 1.0);
         }
-        if (playheadAnimId) { cancelAnimationFrame(playheadAnimId); playheadAnimId = null; }
-        if (playheadEl) playheadEl.style.display = 'none';
+        updatePlayIcons();
     });
 
     // Configuration Changes
@@ -636,13 +657,17 @@ function setupEventListeners() {
 
 
 
-    btnSeqPlay.addEventListener('click', () => {
-        const pat = SequencerPatterns.find(p => p.id == patternSelect.value);
-        engine.startSequencer(pat, parseInt(bpmInput.value));
-    });
-    btnSeqStop.addEventListener('click', () => {
-        engine.stopSequencer();
-        document.querySelectorAll('.seq-step').forEach(el => el.classList.remove('playing'));
+    btnToggleSeq.addEventListener('click', () => {
+        if (engine.ctx.state === 'suspended') engine.ctx.resume();
+        
+        if (engine.seqIsPlaying) {
+            engine.stopSequencer();
+            document.querySelectorAll('.seq-step').forEach(el => el.classList.remove('playing'));
+        } else {
+            const pat = SequencerPatterns.find(p => p.id == patternSelect.value);
+            engine.startSequencer(pat, parseInt(bpmInput.value));
+        }
+        updatePlayIcons();
     });
 
     // Keyboard Shortcuts
@@ -1096,6 +1121,8 @@ async function processAudio() {
 
         renderPads();
         drawWaveform();
+
+        updatePlayIcons();
 
         // 4. Global Key Detection
         const detection = PitchDetector.detectGlobalKey(engine.slices);
@@ -1678,8 +1705,8 @@ function loadSettings() {
             bpmInput.value = settings.bpm || '120';
             
             seqDensity.value = settings.density !== undefined ? settings.density : '50';
-            seqSyncopation.value = settings.syncopation !== undefined ? settings.syncopation : '30';
-            seqNoteRepeat.value = settings.noteRepeat !== undefined ? fromLogPercent(settings.noteRepeat) : '30';
+            seqSyncopation.value = settings.syncopation !== undefined ? settings.syncopation : '39';
+            seqNoteRepeat.value = settings.noteRepeat !== undefined ? fromLogPercent(settings.noteRepeat) : '39';
             if (settings.microTiming !== undefined) seqMicroTiming.value = fromLogPercent(settings.microTiming);
             if (settings.probability !== undefined) seqProbability.value = fromLogPercent(settings.probability);
             if (settings.swing !== undefined) seqSwing.value = fromLogPercent(settings.swing);

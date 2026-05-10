@@ -89,9 +89,16 @@ class PitchDetector {
         
         const data = audioBuffer.getChannelData(0).slice(startOffset, startOffset + length);
         const freq = this.detectPitch(data, audioBuffer.sampleRate);
-        const midi = this.freqToMidi(freq);
+        let midi = this.freqToMidi(freq);
+
+        // Constrain to Octave 2-4 (MIDI 36-71)
+        // Any pitch detected outside this range is ignored (treated as unpitched)
+        if (midi < 36 || midi > 71) {
+            midi = -1;
+        }
+
         return {
-            freq: freq,
+            freq: midi === -1 ? -1 : freq,
             midi: midi, // -1 means unpitched
             noteName: this.midiToNoteName(midi)
         };
