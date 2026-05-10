@@ -952,3 +952,74 @@ input[type=range]::-webkit-slider-runnable-track {
         padding: 0.8rem;
     }
 }
+
+/* Composite Export Group */
+.dual-button-container {
+    display: flex;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.composite-export-group {
+    display: flex;
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.composite-export-group .btn {
+    flex: 1;
+    border-radius: 0;
+    margin: 0;
+    border: none;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.75rem;
+    padding: 0.8rem 0.5rem;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.composite-export-group .btn i {
+    font-size: 1.1rem;
+}
+
+.composite-export-group .btn-primary {
+    background: linear-gradient(135deg, var(--accent-primary), #4f46e5);
+}
+
+.composite-export-group .btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
+}
+
+.composite-export-group .btn:not(:last-child) {
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.composite-export-group .btn:hover {
+    filter: brightness(1.2);
+    transform: translateY(-1px);
+    z-index: 2;
+}
+
+.composite-export-group .btn:active {
+    transform: translateY(0);
+    filter: brightness(0.9);
+}
+
+.composite-export-group #btn-export-wet {
+    border-top-left-radius: 10px;
+    border-bottom-left-radius: 10px;
+}
+
+.composite-export-group #btn-export-midi {
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+}

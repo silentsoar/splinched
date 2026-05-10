@@ -149,8 +149,8 @@
                                     title="Generation Length">
                                     <option value="8">8</option>
                                     <option value="16">16</option>
-                                    <option value="32" selected>32</option>
-                                    <option value="64">64</option>
+                                    <option value="32">32</option>
+                                    <option value="64" selected>64</option>
                                     <option value="128">128</option>
                                     <option value="256">256</option>
                                 </select>
@@ -287,9 +287,24 @@
                         </div>
 
                         <div class="export-actions mt-1rem">
-                            <button id="btn-export-seq" class="btn btn-primary full-width">
-                                <i class="fas fa-file-audio"></i> Export Sequence as WAV
-                            </button>
+                            <div class="dual-button-container">
+                                <div class="composite-export-group">
+                                    <button id="btn-export-wet" class="btn btn-primary" title="Export WAV with Effects">
+                                        <i class="fas fa-tint"></i> Wet
+                                    </button>
+                                    <button id="btn-export-dry" class="btn btn-primary" title="Export Dry WAV">
+                                        <i class="fas fa-tint-slash"></i> Dry
+                                    </button>
+                                </div>
+                                <div class="composite-export-group">
+                                    <button id="btn-export-midi" class="btn btn-secondary" title="Download MIDI Melody">
+                                        <i class="fas fa-music"></i> MIDI (Melody)
+                                    </button>
+                                    <button id="btn-export-midi-chords" class="btn btn-secondary" title="Download MIDI Chords">
+                                        <i class="fas fa-layer-group"></i> Melody (Chords)
+                                    </button>
+                                </div>
+                            </div>
                             <button id="btn-export-zip" class="btn btn-outline full-width mt-05rem">
                                 <i class="fas fa-file-archive"></i> Export All Slices (ZIP)
                             </button>
@@ -477,6 +492,7 @@
     <script src="wav-encoder.js"></script>
     <script src="audio-engine.js"></script>
     <script src="midi-handler.js"></script>
+    <script src="midi-exporter.js"></script>
     <script src="app.js"></script>
 </body>
 

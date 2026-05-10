@@ -775,11 +775,11 @@ class AudioEngine {
 
     // --- Offline Render ---
     
-    async renderSequenceToBuffer() {
+    async renderSequenceToBuffer(includeEffects = false) {
         if (!this.seqPattern || this.slices.length === 0 || !this.buffer) return null;
         
         const secondsPerBeat = 60.0 / this.seqBpm;
-        const totalTime = (this.seqPattern.length * 0.25 * secondsPerBeat);
+        const totalTime = (this.seqPattern.length * 0.25 * secondsPerBeat) + 2.0; // Add 2s tail for reverb/delay
         
         const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
             this.buffer.numberOfChannels, 
@@ -787,11 +787,73 @@ class AudioEngine {
             this.buffer.sampleRate
         );
 
+        // Recreate effects chain in offline context if needed
+        let finalDest = offlineCtx.destination;
+        
+        if (includeEffects) {
+            const oEqLow = offlineCtx.createBiquadFilter();
+            oEqLow.type = 'lowshelf';
+            oEqLow.frequency.value = this.eqLow.frequency.value;
+            oEqLow.gain.value = this.eqLow.gain.value;
+
+            const oEqMid = offlineCtx.createBiquadFilter();
+            oEqMid.type = 'peaking';
+            oEqMid.frequency.value = this.eqMid.frequency.value;
+            oEqMid.Q.value = this.eqMid.Q.value;
+            oEqMid.gain.value = this.eqMid.gain.value;
+
+            const oEqHigh = offlineCtx.createBiquadFilter();
+            oEqHigh.type = 'highshelf';
+            oEqHigh.frequency.value = this.eqHigh.frequency.value;
+            oEqHigh.gain.value = this.eqHigh.gain.value;
+
+            const oDist = offlineCtx.createWaveShaper();
+            oDist.curve = this.distortion.curve;
+
+            const oComp = offlineCtx.createDynamicsCompressor();
+            oComp.threshold.value = this.compressor.threshold.value;
+            oComp.ratio.value = this.compressor.ratio.value;
+            oComp.knee.value = this.compressor.knee.value;
+            oComp.attack.value = this.compressor.attack.value;
+            oComp.release.value = this.compressor.release.value;
+
+            const oDelay = offlineCtx.createDelay(1.0);
+            oDelay.delayTime.value = this.delay.delayTime.value;
+            const oDelayFB = offlineCtx.createGain();
+            oDelayFB.gain.value = this.delayFeedback.gain.value;
+            const oDelayGain = offlineCtx.createGain();
+            oDelayGain.gain.value = this.delayGain.gain.value;
+
+            const oReverb = offlineCtx.createConvolver();
+            oReverb.buffer = this.reverb.buffer;
+            const oReverbGain = offlineCtx.createGain();
+            oReverbGain.gain.value = this.reverbGain.gain.value;
+
+            // Routing
+            oEqLow.connect(oEqMid);
+            oEqMid.connect(oEqHigh);
+            oEqHigh.connect(oDist);
+            oDist.connect(oComp);
+            oComp.connect(offlineCtx.destination);
+
+            oDist.connect(oDelay);
+            oDelay.connect(oDelayFB);
+            oDelayFB.connect(oDelay);
+            oDelay.connect(oDelayGain);
+            oDelayGain.connect(offlineCtx.destination);
+
+            oDist.connect(oReverb);
+            oReverb.connect(oReverbGain);
+            oReverbGain.connect(offlineCtx.destination);
+
+            finalDest = oEqLow;
+        }
+
         let baseTime = 0;
         const maskedPattern = this.getMaskedPattern();
         for(let stepNumber=0; stepNumber < this.seqPattern.length; stepNumber++) {
             if (this.kickEnabled && stepNumber % 4 === 0) {
-                this._playKick(baseTime, offlineCtx, offlineCtx.destination);
+                this._playKick(baseTime, offlineCtx, finalDest);
             }
 
             const stepData = maskedPattern[stepNumber];
@@ -805,7 +867,7 @@ class AudioEngine {
                 }
                 
                 if (stepData.microTiming) {
-                    time += (stepData.microTiming * stepDuration);
+                    time += stepData.microTiming;
                 }
 
                 const sliceIdLookup = stepData.sliceId !== undefined ? stepData.sliceId : stepNumber;
@@ -831,7 +893,7 @@ class AudioEngine {
                     let t = time + (r * ratchetSpacing);
                     
                     if (this.sampleEnabled) {
-                        this._createSource(sliceId, t, rate, offlineCtx, offlineCtx.destination);
+                        this._createSource(sliceId, t, rate, offlineCtx, finalDest);
                     }
                     if (this.toneEnabled && slice.pitch.midi > 0) {
                         let targetMidi = slice.pitch.midi;
@@ -844,7 +906,7 @@ class AudioEngine {
                                 targetMidi = validNotes[idx] + (this.musicalOctave * 12);
                             }
                         }
-                        this._createTone(targetMidi, t, ratchetSpacing, offlineCtx, offlineCtx.destination);
+                        this._createTone(targetMidi, t, ratchetSpacing, offlineCtx, finalDest);
                     }
                 }
             }

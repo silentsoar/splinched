@@ -88,7 +88,10 @@ const valKick = document.getElementById('val-kick');
 const btnToggleSeq = document.getElementById('btn-toggle-seq');
 const seqGrid = document.getElementById('seq-grid');
 
-const btnExportSeq = document.getElementById('btn-export-seq');
+const btnExportWet = document.getElementById('btn-export-wet');
+const btnExportDry = document.getElementById('btn-export-dry');
+const btnExportMidi = document.getElementById('btn-export-midi');
+const btnExportMidiChords = document.getElementById('btn-export-midi-chords');
 const btnExportZip = document.getElementById('btn-export-zip');
 const filenameDisplay = document.getElementById('filename-display');
 const midiStatus = document.getElementById('midi-status');
@@ -758,7 +761,10 @@ function setupEventListeners() {
     });
 
     // Exporting
-    btnExportSeq.addEventListener('click', exportSequence);
+    if (btnExportWet) btnExportWet.addEventListener('click', () => exportSequence(true));
+    if (btnExportDry) btnExportDry.addEventListener('click', () => exportSequence(false));
+    if (btnExportMidi) btnExportMidi.addEventListener('click', exportMidi);
+    if (btnExportMidiChords) btnExportMidiChords.addEventListener('click', exportMidiChords);
     btnExportZip.addEventListener('click', exportZip);
     // Demo File
     const btnLoadDemo = document.getElementById('btn-load-demo');
@@ -784,7 +790,7 @@ function setupEventListeners() {
 function generateAlgorithmicPattern(strategy) {
     if (!engine.buffer || engine.slices.length === 0) return;
     
-    const len = parseInt(algoLenSelect.value) || 32;
+    const len = parseInt(algoLenSelect.value) || 64;
     const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode);
     
     let steps = [];
@@ -1292,19 +1298,37 @@ function renderSequencerGrid() {
     if (typeof drawWaveform === 'function') {
         drawWaveform();
     }
+    renderPads();
 }
 
 function renderPads() {
     padsContainer.innerHTML = '';
     keyMap = {};
     
-    for (let index = 0; index < 16; index++) {
-        let sliceId = engine.padMapping[index];
-        if (sliceId === undefined || sliceId >= engine.slices.length) {
-            sliceId = index % Math.max(1, engine.slices.length);
-        }
+    if (!engine.slices || engine.slices.length === 0) return;
+
+    // Get unique sliceIds used in the current pattern
+    const maskedPattern = engine.getMaskedPattern();
+    const usedSliceIds = new Set();
+    
+    if (maskedPattern) {
+        maskedPattern.forEach((step, idx) => {
+            if (step.active) {
+                const sliceIdLookup = step.sliceId !== undefined ? step.sliceId : idx;
+                usedSliceIds.add(sliceIdLookup % engine.slices.length);
+            }
+        });
+    }
+    
+    // Sort used slices by their ID
+    const sortedUsedSliceIds = Array.from(usedSliceIds).sort((a, b) => a - b);
+    
+    // Rebuild padMapping to match the displayed pads
+    engine.padMapping = sortedUsedSliceIds;
+
+    sortedUsedSliceIds.forEach((sliceId, index) => {
         const slice = engine.slices[sliceId];
-        if (!slice) continue;
+        if (!slice) return;
 
         const keyChar = index < KEYS.length ? KEYS[index] : '';
         if (keyChar) keyMap[keyChar] = index;
@@ -1319,7 +1343,7 @@ function renderPads() {
         pad.innerHTML = `
             ${keyChar ? `<span class="pad-key">${keyChar}</span>` : ''}
             <span class="pad-pitch">${pitchText}</span>
-            <span class="pad-number">${index + 1}</span>
+            <span class="pad-number">S${sliceId + 1}</span>
         `;
 
         pad.addEventListener('mousedown', () => triggerPad(index));
@@ -1329,17 +1353,15 @@ function renderPads() {
         // Drag and Drop for Pads
         pad.draggable = true;
         pad.addEventListener('dragstart', (e) => {
-            const sliceId = engine.padMapping[index];
-            if (sliceId !== undefined) {
-                e.dataTransfer.setData('application/json', JSON.stringify({ type: 'slice', id: sliceId }));
-                const dragDiv = document.createElement('div');
-                dragDiv.textContent = `Slice ${sliceId + 1}`;
-                dragDiv.style.cssText = "position:absolute; top:-1000px; padding:8px 12px; background:#6366f1; color:white; border-radius:6px;";
-                document.body.appendChild(dragDiv);
-                e.dataTransfer.setDragImage(dragDiv, 0, 0);
-                setTimeout(() => document.body.removeChild(dragDiv), 0);
-            }
+            e.dataTransfer.setData('application/json', JSON.stringify({ type: 'slice', id: sliceId }));
+            const dragDiv = document.createElement('div');
+            dragDiv.textContent = `Slice ${sliceId + 1}`;
+            dragDiv.style.cssText = "position:absolute; top:-1000px; padding:8px 12px; background:#6366f1; color:white; border-radius:6px;";
+            document.body.appendChild(dragDiv);
+            e.dataTransfer.setDragImage(dragDiv, 0, 0);
+            setTimeout(() => document.body.removeChild(dragDiv), 0);
         });
+        
         pad.addEventListener('dragover', (e) => {
             e.preventDefault();
             pad.classList.add('drag-over');
@@ -1351,7 +1373,12 @@ function renderPads() {
             try {
                 const data = JSON.parse(e.dataTransfer.getData('application/json'));
                 if (data.type === 'slice') {
+                    // Update the pad mapping for this index
                     engine.padMapping[index] = data.id;
+                    // Find all steps that use the old sliceId at this position and update them?
+                    // Actually, if we just update the mapping, we should probably update the pattern too
+                    // if the user intended to replace this slice in the pattern.
+                    // But for now, let's keep it simple: just update the pad.
                     renderPads();
                     engine.playPad(data.id);
                 }
@@ -1359,7 +1386,7 @@ function renderPads() {
         });
 
         padsContainer.appendChild(pad);
-    }
+    });
 }
 
 function triggerPad(padIndex) {
@@ -1511,13 +1538,14 @@ function handleMidiNoteOff(note) {
 
 // --- Exporting ---
 
-async function exportSequence() {
+async function exportSequence(includeEffects = false) {
     if (!engine.buffer || engine.slices.length === 0) return;
     
     const patId = patternSelect.value;
     const pattern = SequencerPatterns.find(p => p.id == patId);
     
-    showLoading('Rendering WAV', 'Generating high-quality sequence export...');
+    const modeStr = includeEffects ? 'Wet' : 'Dry';
+    showLoading(`Rendering WAV (${modeStr})`, 'Generating high-quality sequence export...');
     await new Promise(resolve => setTimeout(resolve, 50));
     
     // Temporarily set engine sequence config
@@ -1525,13 +1553,62 @@ async function exportSequence() {
     engine.seqBpm = parseInt(bpmInput.value);
 
     try {
-        const renderedBuffer = await engine.renderSequenceToBuffer();
+        const renderedBuffer = await engine.renderSequenceToBuffer(includeEffects);
         if (renderedBuffer) {
             const blob = WavEncoder.encode(renderedBuffer);
-            downloadBlob(blob, `sequence-${pattern.name.replace(/\s+/g, '-').toLowerCase()}.wav`);
+            downloadBlob(blob, `sequence-${pattern.name.replace(/\s+/g, '-').toLowerCase()}-${modeStr.toLowerCase()}.wav`);
         }
     } catch(err) {
         alert("Error rendering sequence: " + err);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function exportMidi() {
+    if (!engine.buffer || engine.slices.length === 0) return;
+    
+    const patId = patternSelect.value;
+    const pattern = SequencerPatterns.find(p => p.id == patId);
+    
+    showLoading('Generating MIDI', 'Creating standard MIDI file...');
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    try {
+        const blob = MidiExporter.generateMidiBlob(pattern, parseInt(bpmInput.value), engine.slices);
+        if (blob) {
+            downloadBlob(blob, `sequence-${pattern.name.replace(/\s+/g, '-').toLowerCase()}.mid`);
+        }
+    } catch(err) {
+        alert("Error generating MIDI: " + err);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function exportMidiChords() {
+    if (!engine.buffer || engine.slices.length === 0) return;
+    
+    const patId = patternSelect.value;
+    const pattern = SequencerPatterns.find(p => p.id == patId);
+    
+    showLoading('Generating MIDI Chords', 'Creating complementary sustained chords...');
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    try {
+        const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode);
+        const blob = MidiExporter.generateChordsMidiBlob(
+            pattern, 
+            parseInt(bpmInput.value), 
+            engine.musicalKey, 
+            engine.musicalMode,
+            validNotes
+        );
+        if (blob) {
+            downloadBlob(blob, `sequence-${pattern.name.replace(/\s+/g, '-').toLowerCase()}-chords.mid`);
+        }
+    } catch(err) {
+        alert("Error generating MIDI chords: " + err);
     } finally {
         hideLoading();
     }
