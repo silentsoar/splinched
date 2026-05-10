@@ -47,11 +47,13 @@ class AudioEngine {
         this.allSlices = {};
         this.activeAlgo = 'transient';
         this.padMapping = Array.from({length: 16}, (_, i) => i);
-        this.toneOnly = false;
+        this.toneEnabled = false;
+        this.sampleEnabled = true;
         this._cachedMaskedPattern = null;
         this._lastMaskParams = "";
 
         this.fxEnabled = true;
+        this.smartCompEnabled = false;
         this._setupEffects();
     }
 
@@ -89,12 +91,21 @@ class AudioEngine {
         this.reverbGain = this.ctx.createGain();
         this.reverbGain.gain.value = 0.3;
 
-        // 5. Routing
-        // Source -> EQ Low -> EQ Mid -> EQ High -> Distortion -> Output
+        // 5. Compressor
+        this.compressor = this.ctx.createDynamicsCompressor();
+        this.compressor.threshold.value = 0; 
+        this.compressor.ratio.value = 12;
+        this.compressor.knee.value = 30;
+        this.compressor.attack.value = 0.003;
+        this.compressor.release.value = 0.25;
+
+        // 6. Routing
+        // Source -> EQ Low -> EQ Mid -> EQ High -> Distortion -> Compressor -> Output
         this.eqLow.connect(this.eqMid);
         this.eqMid.connect(this.eqHigh);
         this.eqHigh.connect(this.distortion);
-        this.distortion.connect(this.globalGain);
+        this.distortion.connect(this.compressor);
+        this.compressor.connect(this.globalGain);
 
         // Parallel Routing for Delay/Reverb
         this.distortion.connect(this.delay);
@@ -106,6 +117,33 @@ class AudioEngine {
         this.distortion.connect(this.reverb);
         this.reverb.connect(this.reverbGain);
         this.reverbGain.connect(this.globalGain);
+    }
+
+    _optimizeCompressor() {
+        if (!this.buffer || !this.smartCompEnabled) return;
+
+        // Analyze buffer for peak levels to set intelligent threshold
+        let maxPeak = 0;
+        for (let i = 0; i < this.buffer.numberOfChannels; i++) {
+            const data = this.buffer.getChannelData(i);
+            // Sample only a portion for performance if buffer is huge, or use a loop
+            for (let j = 0; j < data.length; j += 100) {
+                const abs = Math.abs(data[j]);
+                if (abs > maxPeak) maxPeak = abs;
+            }
+        }
+
+        const peakDb = 20 * Math.log10(Math.max(maxPeak, 0.01));
+        
+        // Intelligent Threshold: 12dB below peak for "glue" and punch
+        const optimalThreshold = Math.max(peakDb - 12, -60);
+        
+        // Settings for a high-quality "smart" drum/sample compressor
+        this.compressor.threshold.setTargetAtTime(optimalThreshold, this.ctx.currentTime, 0.1);
+        this.compressor.ratio.setTargetAtTime(6, this.ctx.currentTime, 0.1);
+        this.compressor.knee.setTargetAtTime(30, this.ctx.currentTime, 0.1);
+        this.compressor.attack.setTargetAtTime(0.005, this.ctx.currentTime, 0.1);
+        this.compressor.release.setTargetAtTime(0.15, this.ctx.currentTime, 0.1);
     }
 
     _makeDistortionCurve(amount) {
@@ -137,6 +175,19 @@ class AudioEngine {
         if (params.reverb !== undefined) this.reverbGain.gain.setTargetAtTime(params.reverb, this.ctx.currentTime, 0.05);
         if (params.delay !== undefined) this.delayGain.gain.setTargetAtTime(params.delay, this.ctx.currentTime, 0.05);
         if (params.distort !== undefined) this.distortion.curve = this._makeDistortionCurve(params.distort * 100);
+        
+        // Smart Compressor Toggle
+        if (params.smartCompEnabled !== undefined) {
+            this.smartCompEnabled = params.smartCompEnabled;
+            if (this.smartCompEnabled) {
+                this._optimizeCompressor();
+            } else {
+                // Bypass: reset to transparent settings
+                this.compressor.threshold.setTargetAtTime(0, this.ctx.currentTime, 0.05);
+                this.compressor.ratio.setTargetAtTime(1, this.ctx.currentTime, 0.05);
+            }
+        }
+
         if (params.eqLow !== undefined) this.eqLow.gain.setTargetAtTime(params.eqLow, this.ctx.currentTime, 0.05);
         if (params.eqMid !== undefined) this.eqMid.gain.setTargetAtTime(params.eqMid, this.ctx.currentTime, 0.05);
         if (params.eqHigh !== undefined) this.eqHigh.gain.setTargetAtTime(params.eqHigh, this.ctx.currentTime, 0.05);
@@ -145,6 +196,7 @@ class AudioEngine {
     async loadAudio(arrayBuffer) {
         if (this.ctx.state === 'suspended') await this.ctx.resume();
         this.buffer = await this.ctx.decodeAudioData(arrayBuffer);
+        this._optimizeCompressor(); // Adapt to new sample levels
         return this.buffer;
     }
 
@@ -485,10 +537,11 @@ class AudioEngine {
             rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, midiNoteOverride);
         }
 
-        if (this.toneOnly && slice.pitch.midi > 0) {
-            this._createTone(slice.pitch.midi, this.ctx.currentTime);
-        } else {
+        if (this.sampleEnabled) {
             this._createSource(sliceId, this.ctx.currentTime, rate);
+        }
+        if (this.toneEnabled && slice.pitch.midi > 0) {
+            this._createTone(slice.pitch.midi, this.ctx.currentTime);
         }
     }
 
@@ -685,7 +738,12 @@ class AudioEngine {
         for (let r = 0; r < ratchets; r++) {
             let t = time + (r * ratchetSpacing);
             
-            if (this.toneOnly && slice.pitch.midi > 0) {
+            // Independent layering: Sample and Tone can both be enabled
+            if (this.sampleEnabled) {
+                this._createSource(sliceId, t, rate);
+            }
+
+            if (this.toneEnabled && slice.pitch.midi > 0) {
                 // Determine the target MIDI note
                 let targetMidi = slice.pitch.midi;
                 if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
@@ -697,9 +755,7 @@ class AudioEngine {
                         targetMidi = validNotes[idx] + (this.musicalOctave * 12);
                     }
                 }
-                this._createTone(targetMidi, t, ratchetSpacing);
-            } else {
-                this._createSource(sliceId, t, rate);
+                this._createTone(targetMidi, t, ratchetSpacing * 0.8);
             }
         }
     }
@@ -774,7 +830,10 @@ class AudioEngine {
                 for (let r = 0; r < ratchets; r++) {
                     let t = time + (r * ratchetSpacing);
                     
-                    if (this.toneOnly && slice.pitch.midi > 0) {
+                    if (this.sampleEnabled) {
+                        this._createSource(sliceId, t, rate, offlineCtx, offlineCtx.destination);
+                    }
+                    if (this.toneEnabled && slice.pitch.midi > 0) {
                         let targetMidi = slice.pitch.midi;
                         if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
                             const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
@@ -786,8 +845,6 @@ class AudioEngine {
                             }
                         }
                         this._createTone(targetMidi, t, ratchetSpacing, offlineCtx, offlineCtx.destination);
-                    } else {
-                        this._createSource(sliceId, t, rate, offlineCtx, offlineCtx.destination);
                     }
                 }
             }

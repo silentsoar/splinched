@@ -102,6 +102,7 @@ const btnFxToggle = document.getElementById('btn-fx-toggle');
 const fxReverb = document.getElementById('fx-reverb');
 const fxDelay = document.getElementById('fx-delay');
 const fxDistort = document.getElementById('fx-distort');
+const fxSmartComp = document.getElementById('fx-smart-comp');
 const fxEqLow = document.getElementById('fx-eq-low');
 const fxEqMid = document.getElementById('fx-eq-mid');
 const fxEqHigh = document.getElementById('fx-eq-high');
@@ -114,7 +115,8 @@ const valEqMid = document.getElementById('val-eq-mid');
 const valEqHigh = document.getElementById('val-eq-high');
 const adsrCanvas = document.getElementById('adsr-visualizer');
 const adsrCtx = adsrCanvas ? adsrCanvas.getContext('2d') : null;
-const seqToneOnly = document.getElementById('seq-tone-only');
+const seqSample = document.getElementById('seq-sample');
+const seqTone = document.getElementById('seq-tone');
 const algoLenSelect = document.getElementById('algo-len');
 
 // Keyboard shortcut map
@@ -612,8 +614,13 @@ function setupEventListeners() {
         engine.kickLevel = val;
         saveSettings();
     });
-    seqToneOnly.addEventListener('change', (e) => {
-        engine.toneOnly = e.target.checked;
+    seqSample.addEventListener('change', (e) => {
+        engine.sampleEnabled = e.target.checked;
+        saveSettings();
+    });
+
+    seqTone.addEventListener('change', (e) => {
+        engine.toneEnabled = e.target.checked;
         saveSettings();
     });
 
@@ -1622,7 +1629,15 @@ function saveSettings() {
         swing: seqSwing.value,
         kick: kickDrum.checked,
         kickLevel: kickLevel.value,
-        toneOnly: seqToneOnly.checked
+        sample: seqSample.checked,
+        tone: seqTone.checked,
+        reverb: fxReverb.value,
+        delay: fxDelay.value,
+        distort: fxDistort.value,
+        smartComp: fxSmartComp ? fxSmartComp.checked : false,
+        eqLow: fxEqLow.value,
+        eqMid: fxEqMid.value,
+        eqHigh: fxEqHigh.value
     };
     localStorage.setItem('splinchedSettings', JSON.stringify(settings));
 }
@@ -1671,7 +1686,19 @@ function loadSettings() {
             if (settings.kick !== undefined) kickDrum.checked = settings.kick;
             if (settings.kickLevel !== undefined) kickLevel.value = fromLogPercent(settings.kickLevel);
             else kickLevel.value = fromLogPercent(0.3);
-            if (settings.toneOnly !== undefined) seqToneOnly.checked = settings.toneOnly;
+            if (settings.sample !== undefined) seqSample.checked = settings.sample;
+            else seqSample.checked = true;
+            if (settings.tone !== undefined) seqTone.checked = settings.tone;
+            else seqTone.checked = false;
+
+            // Load FX values
+            if (settings.reverb !== undefined) fxReverb.value = settings.reverb;
+            if (settings.delay !== undefined) fxDelay.value = settings.delay;
+            if (settings.distort !== undefined) fxDistort.value = settings.distort;
+            if (settings.smartComp !== undefined && fxSmartComp) fxSmartComp.checked = settings.smartComp;
+            if (settings.eqLow !== undefined) fxEqLow.value = settings.eqLow;
+            if (settings.eqMid !== undefined) fxEqMid.value = settings.eqMid;
+            if (settings.eqHigh !== undefined) fxEqHigh.value = settings.eqHigh;
             
             // Dispatch events to update UI text visually
             const e = new Event('input');
@@ -1684,6 +1711,15 @@ function loadSettings() {
             seqNoteRepeat.dispatchEvent(e);
             seqMicroTiming.dispatchEvent(e);
             seqProbability.dispatchEvent(e);
+            fxReverb.dispatchEvent(e);
+            fxDelay.dispatchEvent(e);
+            fxDistort.dispatchEvent(e);
+            if (fxSmartComp) {
+                engine.updateEffects({ smartCompEnabled: fxSmartComp.checked });
+            }
+            fxEqLow.dispatchEvent(e);
+            fxEqMid.dispatchEvent(e);
+            fxEqHigh.dispatchEvent(e);
             // Update UI styles after loading
             Object.keys(SLIDER_DEFAULTS).forEach(id => {
                 const el = document.getElementById(id);
@@ -1693,7 +1729,8 @@ function loadSettings() {
             engine.setMusicalConfig(keySelect.value, modeSelect.value, octaveSelect.value);
             engine.globalChoke = globalChokeCheckbox.checked;
             engine.kickEnabled = kickDrum.checked;
-            engine.toneOnly = seqToneOnly.checked;
+            engine.sampleEnabled = seqSample.checked;
+            engine.toneEnabled = seqTone.checked;
             engine.seqPattern = SequencerPatterns.find(p => p.id == patternSelect.value);
         } catch(e) {}
     } else {
@@ -1810,6 +1847,13 @@ if (fxDistort) {
         engine.updateEffects({ distort: val });
         valDistort.textContent = Math.round(val * 100) + '%';
         e.target.classList.toggle('is-default', val === 0);
+    });
+}
+
+if (fxSmartComp) {
+    fxSmartComp.addEventListener('change', (e) => {
+        engine.updateEffects({ smartCompEnabled: e.target.checked });
+        saveSettings();
     });
 }
 if (fxEqLow) {

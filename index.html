@@ -89,6 +89,13 @@
                         <input type="range" id="fx-distort" class="is-default" min="0" max="1" step="0.01" value="0">
                         <span class="val" id="val-distort">0%</span>
                     </div>
+                    
+                    <!-- Smart Compressor -->
+                    <div class="fx-divider"></div>
+                    <div class="fx-item" style="min-width: 100px; flex: 0 0 auto;">
+                        <label style="margin-right: 0.5rem;">Smart Comp</label>
+                        <input type="checkbox" id="fx-smart-comp" class="custom-checkbox">
+                    </div>
                     <div class="fx-divider"></div>
                     <div class="fx-item">
                         <label>EQ Low</label>
@@ -256,6 +263,14 @@
                                     <!-- Populated by JS -->
                                 </select>
                             </div>
+                            <div class="param-group" style="width: 80px; flex: 0 0 auto;">
+                                <label>Sample</label>
+                                <input type="checkbox" id="seq-sample" class="custom-checkbox" checked>
+                            </div>
+                            <div class="param-group" style="width: 60px; flex: 0 0 auto;">
+                                <label>Tone</label>
+                                <input type="checkbox" id="seq-tone" class="custom-checkbox">
+                            </div>
                             <div class="param-group" style="width: 100px;">
                                 <label for="seq-bpm">BPM</label>
                                 <input type="number" id="seq-bpm" value="120" min="40" max="300" class="custom-select">
@@ -336,12 +351,6 @@
                                     </div>
                                 </div>
                                 <input type="range" id="kick-level" min="0" max="100" value="30">
-                            </div>
-                            <div class="param-group" style="justify-content: flex-end; padding-bottom: 0.5rem;">
-                                <div style="display: flex; align-items: center; gap: 0.6rem; background: rgba(99, 102, 241, 0.1); padding: 0.6rem 1rem; border-radius: var(--radius-md); border: 1px solid rgba(99, 102, 241, 0.3); transition: all 0.2s;">
-                                    <input type="checkbox" id="seq-tone-only" class="custom-checkbox">
-                                    <label for="seq-tone-only" style="margin: 0; cursor: pointer; color: var(--accent-secondary); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase;">Tone Only</label>
-                                </div>
                             </div>
                         </div>
 
