@@ -76,8 +76,8 @@
                     </button>
                     <div class="fx-item">
                         <label>Reverb</label>
-                        <input type="range" id="fx-reverb" class="is-default" min="0" max="1" step="0.01" value="0">
-                        <span class="val" id="val-reverb">0%</span>
+                        <input type="range" id="fx-reverb" min="0" max="1" step="0.01" value="0.3">
+                        <span class="val" id="val-reverb">30%</span>
                     </div>
                     <div class="fx-item">
                         <label>Delay</label>
@@ -262,15 +262,10 @@
                             </div>
                         </div>
 
-                        <div class="param-row mt-05rem">
-                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; width: 100%;">
-                                <button id="btn-rand-rhythmic" class="btn btn-outline flex-1" title="Random Rhythmic"><i class="fas fa-drum"></i> Rhythmic</button>
-                                <button id="btn-rand-melodic" class="btn btn-outline flex-1" title="Random Melodic"><i class="fas fa-music"></i> Melodic</button>
-                                <button id="btn-reroll-slices" class="btn btn-secondary flex-1" title="Re-roll Slices"><i class="fas fa-random"></i> Slices</button>
-                                <button id="btn-save-pattern" class="btn btn-secondary flex-1" title="Save Pattern to LocalStorage"><i class="fas fa-save"></i> Save</button>
-                            </div>
-                        </div>
 
+                        <div class="param-row mt-1rem" style="margin-bottom: -0.5rem;">
+                            <label style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Pattern algorithm</label>
+                        </div>
                         <div class="param-row mt-05rem">
                             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; width: 100%; align-items: center;">
                                 <select id="algo-len" class="custom-select" style="max-width: 65px; background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4);" title="Generation Length">
@@ -305,21 +300,7 @@
                             </div>
                         </div>
 
-                        <!-- Euclidean Generator -->
-                        <div class="param-row mt-1rem" style="background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 8px;">
-                            <div class="param-group flex-1">
-                                <label for="euclidean-steps">Euc. Steps</label>
-                                <input type="number" id="euclidean-steps" value="16" min="1" max="64" class="custom-select">
-                            </div>
-                            <div class="param-group flex-1">
-                                <label for="euclidean-pulses">Euc. Pulses</label>
-                                <input type="number" id="euclidean-pulses" value="5" min="1" max="64" class="custom-select">
-                            </div>
-                            <div class="param-group">
-                                <label>&nbsp;</label>
-                                <button id="btn-generate-euclidean" class="btn btn-outline" style="height: 100%;">Generate</button>
-                            </div>
-                        </div>
+
 
                         <div class="param-row mt-1rem">
                             <div class="param-group">
@@ -327,12 +308,12 @@
                                 <input type="range" id="seq-density" min="0" max="100" value="50">
                             </div>
                             <div class="param-group">
-                                <label for="seq-syncopation">Syncopation <span id="val-syncopation" class="hint">0%</span></label>
-                                <input type="range" id="seq-syncopation" min="0" max="100" value="0">
+                                <label for="seq-syncopation">Syncopation <span id="val-syncopation" class="hint">30%</span></label>
+                                <input type="range" id="seq-syncopation" min="0" max="100" value="30">
                             </div>
                             <div class="param-group">
-                                <label for="seq-note-repeat">Note Repeat <span id="val-note-repeat" class="hint">0%</span></label>
-                                <input type="range" id="seq-note-repeat" min="0" max="100" value="0">
+                                <label for="seq-note-repeat">Note Repeat <span id="val-note-repeat" class="hint">30%</span></label>
+                                <input type="range" id="seq-note-repeat" min="0" max="100" value="30">
                             </div>
                             <div class="param-group">
                                 <label for="seq-micro-timing">Micro-Timing <span id="val-micro-timing" class="hint">0%</span></label>

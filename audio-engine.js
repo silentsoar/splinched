@@ -21,8 +21,8 @@ class AudioEngine {
         this.seqPattern = null;
         this.seqBpm = 120;
         this.seqDensity = 0.5;
-        this.seqSyncopation = 0.0;
-        this.seqNoteRepeat = 0.0;
+        this.seqSyncopation = 0.3;
+        this.seqNoteRepeat = 0.3;
         this.seqMicroTiming = 0.0;
         this.seqProbability = 1.0;
         this.seqSwing = 0.0;
@@ -87,7 +87,7 @@ class AudioEngine {
         this.reverb = this.ctx.createConvolver();
         this.reverb.buffer = this._generateReverbImpulse(1.5, 2.0);
         this.reverbGain = this.ctx.createGain();
-        this.reverbGain.gain.value = 0;
+        this.reverbGain.gain.value = 0.3;
 
         // 5. Routing
         // Source -> EQ Low -> EQ Mid -> EQ High -> Distortion -> Output
