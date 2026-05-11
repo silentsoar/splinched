@@ -92,7 +92,6 @@ const btnExportWet = document.getElementById('btn-export-wet');
 const btnExportDry = document.getElementById('btn-export-dry');
 const btnExportMidi = document.getElementById('btn-export-midi');
 const btnExportMidiChords = document.getElementById('btn-export-midi-chords');
-const btnExportZip = document.getElementById('btn-export-zip');
 const filenameDisplay = document.getElementById('filename-display');
 const midiStatus = document.getElementById('midi-status');
 const autoKeyDisplay = document.getElementById('auto-key-display');
@@ -116,8 +115,9 @@ const valEqMid = document.getElementById('val-eq-mid');
 const valEqHigh = document.getElementById('val-eq-high');
 const adsrCanvas = document.getElementById('adsr-visualizer');
 const adsrCtx = adsrCanvas ? adsrCanvas.getContext('2d') : null;
-const seqSample = document.getElementById('seq-sample');
-const seqTone = document.getElementById('seq-tone');
+const toneCheck = document.getElementById('seq-tone');
+const chordsCheck = document.getElementById('seq-tone-chords');
+const sampleCheck = document.getElementById('seq-sample');
 const algoLenSelect = document.getElementById('algo-len');
 
 // Keyboard shortcut map
@@ -638,13 +638,18 @@ function setupEventListeners() {
         engine.kickLevel = val;
         saveSettings();
     });
-    seqSample.addEventListener('change', (e) => {
+    sampleCheck.addEventListener('change', (e) => {
         engine.sampleEnabled = e.target.checked;
         saveSettings();
     });
 
-    seqTone.addEventListener('change', (e) => {
+    toneCheck.addEventListener('change', (e) => {
         engine.toneEnabled = e.target.checked;
+        saveSettings();
+    });
+
+    chordsCheck.addEventListener('change', (e) => {
+        engine.chordsEnabled = e.target.checked;
         saveSettings();
     });
 
@@ -765,7 +770,6 @@ function setupEventListeners() {
     if (btnExportDry) btnExportDry.addEventListener('click', () => exportSequence(false));
     if (btnExportMidi) btnExportMidi.addEventListener('click', exportMidi);
     if (btnExportMidiChords) btnExportMidiChords.addEventListener('click', exportMidiChords);
-    btnExportZip.addEventListener('click', exportZip);
     // Demo File
     const btnLoadDemo = document.getElementById('btn-load-demo');
     if (btnLoadDemo) {
@@ -796,25 +800,19 @@ function generateAlgorithmicPattern(strategy) {
     let steps = [];
     const density = engine.seqDensity || 0.5;
 
-    // Helper to find the slice closest to a target scale index
     const findBestSlice = (targetIdx) => {
         const targetMidi = validNotes[targetIdx];
         let bestSliceId = 0;
         let minDiff = Infinity;
-        
         engine.slices.forEach((slice, idx) => {
             if (slice.pitch && slice.pitch.midi > 0) {
                 const diff = Math.abs(slice.pitch.midi - targetMidi);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    bestSliceId = idx;
-                }
+                if (diff < minDiff) { minDiff = diff; bestSliceId = idx; }
             }
         });
         return bestSliceId;
     };
 
-    // Helper to get melodic offset for a given currentIdx and slice
     const getOffset = (currentIdx, sliceId) => {
         const slice = engine.slices[sliceId];
         if (slice && slice.pitch && slice.pitch.midi > 0) {
@@ -825,163 +823,198 @@ function generateAlgorithmicPattern(strategy) {
         return 0;
     };
 
+    let i = 0;
     if (strategy === 'Brownian') {
-        let currentIdx = Math.floor(validNotes.length / 2) - 7; 
-        let lastLeap = 0; 
-        for (let i = 0; i < len; i++) {
+        let currentIdx = Math.floor(validNotes.length / 2) - 7;
+        let lastLeap = 0;
+        while (i < len) {
             if (Math.random() < density) {
+                let duration = Math.random() < 0.2 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                duration = Math.min(duration, len - i);
+                let isChord = duration > 1 && Math.random() < 0.4;
                 let interval = (Math.abs(lastLeap) >= 3) ? (lastLeap > 0 ? -1 - Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2)) : (Math.random() < 0.6 ? Math.floor(Math.random() * 5) - 2 : (Math.random() > 0.5 ? 3 : -3));
                 if (Math.abs(interval) >= 3) lastLeap = interval; else lastLeap = 0;
                 currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + interval));
-                const center = Math.floor(validNotes.length / 2) - 7;
-                if (Math.abs(currentIdx - center) > 7 && Math.random() > 0.7) currentIdx += (currentIdx > center ? -2 : 2);
-                
                 const sliceId = findBestSlice(currentIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
+                steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Intervallic') {
         let currentIdx = Math.floor(validNotes.length / 2) - 7;
-        for (let i = 0; i < len; i++) {
+        while (i < len) {
             if (Math.random() < density) {
+                let duration = Math.random() < 0.2 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                duration = Math.min(duration, len - i);
+                let isChord = duration > 1 && Math.random() < 0.4;
                 const scaleJump = [1, 2, 4, 7][Math.floor(Math.random() * 4)] * (Math.random() > 0.5 ? 1 : -1);
                 currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + scaleJump));
-                
                 const sliceId = findBestSlice(currentIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
+                steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Euclidean') {
         const pulses = Math.max(1, Math.floor(len * density));
         const rhythmicPattern = SequencerPatterns.generateEuclidean(len, pulses).steps;
-        const arpeggio = [0, 2, 4, 7, 9, 12]; 
+        const arpeggio = [0, 2, 4, 7, 9, 12];
         let arpIdx = 0;
         const rootIdx = Math.floor(validNotes.length / 2) - 14;
-        for (let i = 0; i < len; i++) {
+        while (i < len) {
             if (rhythmicPattern[i].active) {
+                let duration = Math.random() < 0.15 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                duration = Math.min(duration, len - i);
+                let isChord = duration > 1 && Math.random() < 0.3;
                 const currentIdx = rootIdx + arpeggio[arpIdx % arpeggio.length];
                 arpIdx++;
-                
                 const sliceId = findBestSlice(currentIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
+                steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Harmonic') {
-        const chordTones = [0, 2, 4]; 
+        const chordTones = [0, 2, 4];
         const rootIdx = Math.floor(validNotes.length / 2) - 14;
-        for (let i = 0; i < len; i++) {
+        while (i < len) {
             const isPulse = (i % 8 === 0 || i % 8 === 3 || i % 8 === 6);
             if (isPulse && (Math.random() < density * 1.5)) {
+                let duration = [2, 2, 3, 4][Math.floor(Math.random() * 4)];
+                duration = Math.min(duration, len - i);
+                let isChord = Math.random() < 0.8;
                 const currentIdx = rootIdx + chordTones[Math.floor(Math.random() * chordTones.length)] + (Math.floor(i / 8) * 2);
-                
                 const sliceId = findBestSlice(currentIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
+                steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Markov') {
         let currentIdx = Math.floor(validNotes.length / 2) - 7;
         let lastDir = 1;
-        for (let i = 0; i < len; i++) {
+        while (i < len) {
             if (Math.random() < density) {
+                let duration = Math.random() < 0.2 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                duration = Math.min(duration, len - i);
+                let isChord = duration > 1 && Math.random() < 0.4;
                 const stayDir = Math.random() < 0.7;
                 const dir = stayDir ? lastDir : -lastDir;
                 const amount = [1, 1, 2, 3][Math.floor(Math.random() * 4)];
                 currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + (dir * amount)));
                 lastDir = dir;
-                
                 const sliceId = findBestSlice(currentIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
+                steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Stochastic') {
-        for (let i = 0; i < len; i++) {
+        while (i < len) {
             if (Math.random() < density * 1.2) {
+                let duration = Math.random() < 0.25 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                duration = Math.min(duration, len - i);
+                let isChord = duration > 1 && Math.random() < 0.5;
                 const currentIdx = Math.floor(Math.random() * validNotes.length);
                 const sliceId = findBestSlice(currentIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
+                steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Mirror') {
         let halfSteps = [];
+        let hi = 0;
         let currentIdx = Math.floor(validNotes.length / 2) - 7;
-        for (let i = 0; i < len / 2; i++) {
+        while (hi < len / 2) {
             if (Math.random() < density) {
+                let duration = Math.random() < 0.2 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                duration = Math.min(duration, Math.floor(len / 2) - hi);
                 currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + Math.floor(Math.random() * 5) - 2));
-                halfSteps.push({ active: true, idx: currentIdx });
-            } else halfSteps.push({ active: false });
+                halfSteps.push({ active: true, idx: currentIdx, duration });
+                for (let j = 1; j < duration; j++) halfSteps.push({ active: false });
+                hi += duration;
+            } else { halfSteps.push({ active: false }); hi++; }
         }
-        for (let i = 0; i < len; i++) {
-            const isSecondHalf = i >= len / 2;
-            const source = isSecondHalf ? halfSteps[len - 1 - i] : halfSteps[i];
+        for (let j = 0; j < len; j++) {
+            const isSecondHalf = j >= len / 2;
+            const source = isSecondHalf ? halfSteps[len - 1 - j] : halfSteps[j];
             if (source.active) {
                 const sliceId = findBestSlice(source.idx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(source.idx, sliceId) });
-            } else steps.push({ step: i, active: false });
+                const isChord = source.duration > 1 && Math.random() < 0.4;
+                steps.push({ step: j, active: true, duration: source.duration, isChord, sliceId, melodicOffset: getOffset(source.idx, sliceId) });
+                for (let k = 1; k < source.duration; k++) steps.push({ step: j + k, active: false });
+                j += (source.duration - 1);
+            } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Pedal') {
         const rootIdx = Math.floor(validNotes.length / 2) - 14;
         let currentIdx = rootIdx + 7;
-        for (let i = 0; i < len; i++) {
-            const isPedal = i % 2 === 0;
+        for (let j = 0; j < len; j++) {
+            const isPedal = j % 2 === 0;
             if (Math.random() < density * 1.2) {
+                let duration = (isPedal && Math.random() > 0.5) ? 2 : 1;
+                duration = Math.min(duration, len - j);
+                const isChord = duration > 1 && Math.random() < 0.5;
                 const targetIdx = isPedal ? rootIdx : (currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + Math.floor(Math.random() * 3) - 1)));
                 const sliceId = findBestSlice(targetIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(targetIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
+                steps.push({ step: j, active: true, duration, isChord, sliceId, melodicOffset: getOffset(targetIdx, sliceId) });
+                if (duration > 1) { for (let k = 1; k < duration; k++) steps.push({ step: j + k, active: false }); j += (duration - 1); }
+            } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Bitwise') {
         const rootIdx = Math.floor(validNotes.length / 2) - 14;
-        for (let i = 0; i < len; i++) {
-            const isActive = ((i & (i >> 2)) % 3 === 0) && (Math.random() < density * 1.5);
+        for (let j = 0; j < len; j++) {
+            const isActive = ((j & (j >> 2)) % 3 === 0) && (Math.random() < density * 1.5);
             if (isActive) {
-                const currentIdx = rootIdx + ((i ^ (i >> 3)) % 12);
+                let duration = (j % 4 === 0) ? 2 : 1;
+                const isChord = duration > 1 && Math.random() < 0.4;
+                const currentIdx = rootIdx + ((j ^ (j >> 3)) % 12);
                 const sliceId = findBestSlice(currentIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
+                steps.push({ step: j, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                if (duration > 1) { for (let k = 1; k < duration; k++) steps.push({ step: j + k, active: false }); j += (duration - 1); }
+            } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Cellular') {
         const rootIdx = Math.floor(validNotes.length / 2) - 14;
-        let row = new Array(len).fill(0);
-        row[Math.floor(len / 2)] = 1;
+        let row = new Array(len).fill(0); row[Math.floor(len / 2)] = 1;
         const nextRow = (r) => {
             let nr = new Array(len).fill(0);
             for (let j = 0; j < len; j++) {
-                const left = r[(j - 1 + len) % len];
-                const self = r[j];
-                const right = r[(j + 1) % len];
-                const rule = (left << 2) | (self << 1) | right;
-                if ([1, 2, 3, 4].includes(rule)) nr[j] = 1; // Simplified Rule 30-ish
+                const left = r[(j - 1 + len) % len]; const self = r[j]; const right = r[(j + 1) % len];
+                const rule = (left << 2) | (self << 1) | right; nr[j] = [0, 1, 1, 0, 1, 0, 0, 1][rule];
             }
             return nr;
         };
-        for (let i = 0; i < len; i++) {
-            if (row[i] && Math.random() < density * 1.2) {
-                const currentIdx = rootIdx + (i % 14);
+        for (let j = 0; j < 4; j++) row = nextRow(row);
+        for (let j = 0; j < len; j++) {
+            if (row[j] && Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + (j % 12);
                 const sliceId = findBestSlice(currentIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
-            row = nextRow(row);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Fibonacci') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 7;
-        let a = 1, b = 1;
-        for (let i = 0; i < len; i++) {
-            const isActive = Math.random() < density;
-            if (isActive) {
-                const currentIdx = rootIdx + (b % 12);
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        let a = 1, b = 1; let fibs = new Set();
+        for (let j = 0; j < 12; j++) { fibs.add(a % len); let tmp = a; a = b; b = tmp + b; }
+        for (let j = 0; j < len; j++) {
+            if (fibs.has(j) && Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + (j % 12);
                 const sliceId = findBestSlice(currentIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
-            let temp = a + b; a = b; b = temp;
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Anchor') {
         const rootIdx = Math.floor(validNotes.length / 2) - 14;
-        for (let i = 0; i < len; i++) {
-            if (Math.random() < density) {
-                const currentIdx = rootIdx + (Math.random() < 0.8 ? 0 : (Math.random() < 0.5 ? 7 : 12));
-                const sliceId = findBestSlice(currentIdx);
-                steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
-            } else steps.push({ step: i, active: false });
+        for (let j = 0; j < len; j++) {
+            const isAnchor = j % 4 === 0;
+            if ((isAnchor || Math.random() < density) && Math.random() < 0.8) {
+                const targetIdx = isAnchor ? rootIdx : rootIdx + [2, 4, 7, 9, 11][Math.floor(Math.random() * 5)];
+                const sliceId = findBestSlice(targetIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(targetIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Acid') {
         const rootIdx = Math.floor(validNotes.length / 2) - 14;
@@ -1030,6 +1063,12 @@ function generateAlgorithmicPattern(strategy) {
                 steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
             } else steps.push({ step: i, active: false });
         }
+    }
+
+    if (steps.length > len) {
+        steps = steps.slice(0, len);
+    } else while (steps.length < len) {
+        steps.push({ step: steps.length, active: false });
     }
 
     const newPat = {
@@ -1167,17 +1206,24 @@ function renderSequencerGrid() {
     const maskedPattern = engine.getMaskedPattern();
 
     for (let i = 0; i < pattern.length; i++) {
+        const baseStepData = pattern.steps[i];
+        const stepData = maskedPattern && maskedPattern.length > i ? maskedPattern[i] : baseStepData;
+        const duration = stepData.duration || 1;
+
         const stepEl = document.createElement('div');
         stepEl.className = 'seq-step';
         stepEl.id = `seq-step-${i}`;
         
+        if (duration > 1) {
+            stepEl.style.gridColumn = `span ${duration}`;
+            stepEl.classList.add('extended');
+            if (stepData.isChord) stepEl.classList.add('chord');
+        }
+
         // Preserve playing state if active
-        if (engine.seqIsPlaying && engine.seqCurrentStep === i) {
+        if (engine.seqIsPlaying && engine.seqCurrentStep >= i && engine.seqCurrentStep < i + duration) {
             stepEl.classList.add('playing');
         }
-        
-        const baseStepData = pattern.steps[i];
-        const stepData = maskedPattern && maskedPattern.length > i ? maskedPattern[i] : baseStepData;
         
         let sliceInfoStr = '';
         if (engine.slices && engine.slices.length > 0) {
@@ -1292,6 +1338,10 @@ function renderSequencerGrid() {
         });
 
         seqGrid.appendChild(stepEl);
+        
+        if (duration > 1) {
+            i += (duration - 1);
+        }
     }
     
     // Update waveform highlights to reflect active sequencer steps
@@ -1614,32 +1664,6 @@ async function exportMidiChords() {
     }
 }
 
-async function exportZip() {
-    if (!window.JSZip) {
-        alert("JSZip library not loaded.");
-        return;
-    }
-    if (!engine.buffer || engine.slices.length === 0) return;
-
-    showLoading('Creating ZIP', 'Encoding slices and packaging files...');
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const zip = new JSZip();
-
-    engine.slices.forEach((slice, i) => {
-        const blob = WavEncoder.encode(engine.buffer, slice.start, slice.end);
-        zip.file(`slice-${i + 1}_${slice.pitch.noteName}.wav`, blob);
-    });
-
-    try {
-        const content = await zip.generateAsync({type:"blob"});
-        downloadBlob(content, "sample-chopper-slices.zip");
-    } catch(err) {
-        alert("Error generating ZIP: " + err);
-    } finally {
-        hideLoading();
-    }
-}
 
 function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
@@ -1733,8 +1757,9 @@ function saveSettings() {
         swing: seqSwing.value,
         kick: kickDrum.checked,
         kickLevel: kickLevel.value,
-        sample: seqSample.checked,
-        tone: seqTone.checked,
+        sample: sampleCheck.checked,
+        tone: toneCheck.checked,
+        chords: chordsCheck.checked,
         reverb: fxReverb.value,
         delay: fxDelay.value,
         distort: fxDistort.value,
@@ -1790,10 +1815,17 @@ function loadSettings() {
             if (settings.kick !== undefined) kickDrum.checked = settings.kick;
             if (settings.kickLevel !== undefined) kickLevel.value = fromLogPercent(settings.kickLevel);
             else kickLevel.value = fromLogPercent(0.3);
-            if (settings.sample !== undefined) seqSample.checked = settings.sample;
-            else seqSample.checked = true;
-            if (settings.tone !== undefined) seqTone.checked = settings.tone;
-            else seqTone.checked = false;
+            if (settings.sample !== undefined) sampleCheck.checked = settings.sample;
+            else sampleCheck.checked = true;
+            if (settings.tone !== undefined) toneCheck.checked = settings.tone;
+            else toneCheck.checked = false;
+            if (settings.chords !== undefined) chordsCheck.checked = settings.chords;
+            else chordsCheck.checked = false;
+            
+            // Sync engine state
+            engine.sampleEnabled = sampleCheck.checked;
+            engine.toneEnabled = toneCheck.checked;
+            engine.chordsEnabled = chordsCheck.checked;
 
             // Load FX values
             if (settings.reverb !== undefined) fxReverb.value = settings.reverb;

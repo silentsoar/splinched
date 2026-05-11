@@ -491,7 +491,7 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 .seq-step {
-    aspect-ratio: 1;
+    height: 46px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 4px;
     display: flex;
@@ -594,6 +594,32 @@ input[type=range]::-webkit-slider-runnable-track {
     display: flex;
     flex-direction: column;
     min-height: 0;
+}
+
+.seq-step.extended {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
+    border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.seq-step.extended.active {
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+}
+
+.seq-step.extended.chord {
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.seq-step.extended.chord::before {
+    content: 'CHORD';
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 0.5rem;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 1px;
 }
 
 .pads-grid {

@@ -11,8 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <!-- JSZip for exporting ZIP files -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 
 <body>
@@ -161,22 +159,16 @@
                         <div class="param-row mt-1rem" style="margin-bottom: -0.5rem;">
                             <label
                                 style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Pattern
-                                algorithm</label>
+                                algorithm <span style="text-transform: none; opacity: 0.6; font-weight: 400; font-size: 0.7rem; letter-spacing: 0;">(Click to generate)</span></label>
                         </div>
                         <div class="param-row mt-05rem">
                             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; width: 100%; align-items: center;">
-                                <button id="btn-algo-brownian" class="btn btn-secondary flex-1" title="Brownian Contour"
-                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-wave-square"></i> Brown</button>
-                                <button id="btn-algo-intervallic" class="btn btn-secondary flex-1"
-                                    title="Intervallic Jumps" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-arrows-alt-v"></i> Jump</button>
-                                <button id="btn-algo-euclidean" class="btn btn-secondary flex-1"
-                                    title="Euclidean Arpeggio" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-shapes"></i> Euc</button>
                                 <button id="btn-algo-harmonic" class="btn btn-secondary flex-1" title="Harmonic Gates"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
                                         class="fas fa-layer-group"></i> Chord</button>
+                                <button id="btn-algo-brownian" class="btn btn-secondary flex-1" title="Brownian Contour"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-wave-square"></i> Brown</button>
                                 <button id="btn-algo-markov" class="btn btn-secondary flex-1" title="Markov Chain"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
                                         class="fas fa-project-diagram"></i> Mark</button>
@@ -189,14 +181,20 @@
                                 <button id="btn-algo-pedal" class="btn btn-secondary flex-1" title="Pedal Point"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-anchor"></i>
                                     Pedal</button>
+                                <button id="btn-algo-bitwise" class="btn btn-secondary flex-1" title="Bitwise Logic"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-microchip"></i>
+                                    Bit</button>
+                                <button id="btn-algo-intervallic" class="btn btn-secondary flex-1"
+                                    title="Intervallic Jumps" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-arrows-alt-v"></i> Jump</button>
                             </div>
                         </div>
 
                         <div class="param-row mt-05rem">
                             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; width: 100%; align-items: center;">
-                                <button id="btn-algo-bitwise" class="btn btn-secondary flex-1" title="Bitwise Logic"
-                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-microchip"></i>
-                                    Bit</button>
+                                <button id="btn-algo-euclidean" class="btn btn-secondary flex-1"
+                                    title="Euclidean Arpeggio" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-shapes"></i> Euc</button>
                                 <button id="btn-algo-cellular" class="btn btn-secondary flex-1"
                                     title="Cellular Automata" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
                                         class="fas fa-border-all"></i> Cell</button>
@@ -264,20 +262,20 @@
                                 </div>
                                 <input type="range" id="kick-level" min="0" max="100" value="30">
                             </div>
-                        </div>
-
-                        <div class="param-row mt-1rem" style="justify-content: flex-end; gap: 1rem;">
-                            <div class="param-group"
-                                style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
+                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
                                 <label style="margin: 0;">Sample</label>
                                 <input type="checkbox" id="seq-sample" class="custom-checkbox" checked>
                             </div>
-                            <div class="param-group"
-                                style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
+                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
                                 <label style="margin: 0;">Tone</label>
                                 <input type="checkbox" id="seq-tone" class="custom-checkbox">
                             </div>
+                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
+                                <label style="margin: 0;">Chords</label>
+                                <input type="checkbox" id="seq-tone-chords" class="custom-checkbox">
+                            </div>
                         </div>
+
 
                         <!-- Visual Sequencer Grid -->
                         <div class="seq-grid-container mt-1rem">
@@ -298,16 +296,13 @@
                                 </div>
                                 <div class="composite-export-group">
                                     <button id="btn-export-midi" class="btn btn-secondary" title="Download MIDI Melody">
-                                        <i class="fas fa-music"></i> MIDI (Melody)
+                                        <i class="fas fa-music"></i> Melody
                                     </button>
                                     <button id="btn-export-midi-chords" class="btn btn-secondary" title="Download MIDI Chords">
-                                        <i class="fas fa-layer-group"></i> Melody (Chords)
+                                        <i class="fas fa-layer-group"></i> Chords
                                     </button>
                                 </div>
                             </div>
-                            <button id="btn-export-zip" class="btn btn-outline full-width mt-05rem">
-                                <i class="fas fa-file-archive"></i> Export All Slices (ZIP)
-                            </button>
                         </div>
                     </div>
 

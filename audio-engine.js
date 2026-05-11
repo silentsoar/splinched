@@ -48,6 +48,7 @@ class AudioEngine {
         this.activeAlgo = 'transient';
         this.padMapping = Array.from({length: 16}, (_, i) => i);
         this.toneEnabled = false;
+        this.chordsEnabled = false;
         this.sampleEnabled = true;
         this._cachedMaskedPattern = null;
         this._lastMaskParams = "";
@@ -372,7 +373,7 @@ class AudioEngine {
         this.activeSources.clear();
     }
 
-    _createSource(sliceId, time, playbackRate = 1.0, ctx = this.ctx, destination = null) {
+    _createSource(sliceId, time, playbackRate = 1.0, ctx = this.ctx, destination = null, holdDurOverride = -1) {
         const dest = destination || (this.fxEnabled ? this.eqLow : this.globalGain);
         const slice = this.slices.find(s => s.id === sliceId);
         if (!slice || !this.buffer) return null;
@@ -401,36 +402,48 @@ class AudioEngine {
         }
 
         // Base slice duration (how long the note is logically "held" before release)
-        const holdDur = slice.duration / playbackRate;
+        const isExtended = holdDurOverride > 0;
+        const holdDur = isExtended ? holdDurOverride : (slice.duration / playbackRate);
         
+        // Boost sustain for extended notes if it's currently low
+        let effectiveSustain = S;
+        if (isExtended && S < 0.7) effectiveSustain = 0.7;
+
         let audibleDur = holdDur + R;
         // If sustain is zero, the sound dies completely after Attack + Decay phase
-        if (S <= 0.001) {
+        if (effectiveSustain <= 0.001) {
             audibleDur = Math.min(holdDur, A + D);
         }
         
-        // Total physical play duration (bound by actual buffer length)
+        // Total physical play duration (bound by actual buffer length, unless looping)
         const maxAvailableDur = (this.buffer.duration - slice.start) / playbackRate;
-        const playDur = Math.min(audibleDur, maxAvailableDur);
+        let playDur = Math.min(audibleDur, maxAvailableDur);
+
+        // If extended, enable looping to sustain short slices
+        if (isExtended) {
+            source.loop = true;
+            source.loopStart = slice.start;
+            source.loopEnd = slice.end;
+            playDur = audibleDur; // Allow playing past the physical end since we loop
+        }
 
         gainNode.gain.setValueAtTime(0, time);
         
         // Attack
         let peakTime = time + A;
-        if (peakTime > time + holdDur) peakTime = time + holdDur; // cap attack
+        if (peakTime > time + holdDur) peakTime = time + holdDur;
         gainNode.gain.linearRampToValueAtTime(1.0, peakTime);
         
         // Decay
         let decayEndTime = peakTime + D;
-        if (decayEndTime > time + holdDur) decayEndTime = time + holdDur; // cap decay
-        gainNode.gain.linearRampToValueAtTime(S, decayEndTime);
+        if (decayEndTime > time + holdDur) decayEndTime = time + holdDur;
+        gainNode.gain.linearRampToValueAtTime(effectiveSustain, decayEndTime);
         
         // Sustain (hold S until holdDur)
-        gainNode.gain.setValueAtTime(S, time + holdDur);
+        gainNode.gain.setValueAtTime(effectiveSustain, time + holdDur);
         
         // Release
         const releaseEndTime = time + holdDur + R;
-        // avoid small clicks if R is very small by ensuring it goes to 0
         gainNode.gain.linearRampToValueAtTime(0.0001, releaseEndTime);
 
         source.connect(gainNode);
@@ -466,7 +479,6 @@ class AudioEngine {
             this.stopAllNodes();
         }
 
-        // We use a combination of Triangle and Sine for a "lo-fi piano" feel
         const osc = ctx.createOscillator();
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(freq, time);
@@ -479,6 +491,10 @@ class AudioEngine {
         const S = this.adsr.sustain;
         let R = this.adsr.release;
 
+        // Boost sustain for longer notes
+        let effectiveSustain = S;
+        if (holdDur > 0.3 && S < 0.7) effectiveSustain = 0.7;
+
         if (this.adsrDeviation !== 0) {
             const mult = 1.0 + (Math.random() * this.adsrDeviation);
             A *= Math.max(0.001, mult);
@@ -487,7 +503,7 @@ class AudioEngine {
         }
 
         let audibleDur = holdDur + R;
-        if (S <= 0.001) {
+        if (effectiveSustain <= 0.001) {
             audibleDur = Math.min(holdDur, A + D);
         }
 
@@ -501,10 +517,10 @@ class AudioEngine {
         // Decay
         let decayEndTime = peakTime + D;
         if (decayEndTime > time + holdDur) decayEndTime = time + holdDur;
-        gainNode.gain.linearRampToValueAtTime(S * 0.7, decayEndTime);
+        gainNode.gain.linearRampToValueAtTime(effectiveSustain * 0.7, decayEndTime);
         
         // Sustain
-        gainNode.gain.setValueAtTime(S * 0.7, time + holdDur);
+        gainNode.gain.setValueAtTime(effectiveSustain * 0.7, time + holdDur);
         
         // Release
         const releaseEndTime = time + holdDur + R;
@@ -733,14 +749,27 @@ class AudioEngine {
         }
 
         let ratchets = stepData.ratchets || 1;
-        const ratchetSpacing = stepDuration / ratchets;
+        const noteSteps = stepData.duration || 1;
+        const totalNoteDur = noteSteps * stepDuration;
+        const ratchetSpacing = totalNoteDur / ratchets;
         
         for (let r = 0; r < ratchets; r++) {
             let t = time + (r * ratchetSpacing);
+            const holdDur = ratchetSpacing * 0.9; // Small gap between ratchets
             
             // Independent layering: Sample and Tone can both be enabled
             if (this.sampleEnabled) {
-                this._createSource(sliceId, t, rate);
+                const triggerSample = (pitchRate) => this._createSource(sliceId, t, pitchRate, this.ctx, null, holdDur);
+                triggerSample(rate);
+                
+                if (this.chordsEnabled && stepData.isChord) {
+                    // Play major/minor third and fifth based on scale
+                    const intervals = [3, 4, 7]; // Basic intervals for color
+                    intervals.forEach(semi => {
+                        const chordRate = rate * Math.pow(2, semi / 12);
+                        triggerSample(chordRate);
+                    });
+                }
             }
 
             if (this.toneEnabled && slice.pitch.midi > 0) {
@@ -755,7 +784,21 @@ class AudioEngine {
                         targetMidi = validNotes[idx] + (this.musicalOctave * 12);
                     }
                 }
-                this._createTone(targetMidi, t, ratchetSpacing * 0.8);
+                
+                this._createTone(targetMidi, t, holdDur);
+
+                if (this.chordsEnabled && stepData.isChord) {
+                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
+                    let idx = validNotes.indexOf(targetMidi);
+                    if (idx !== -1) {
+                        // Diatonic thirds and fifths
+                        [2, 4].forEach(offset => {
+                            if (idx + offset < validNotes.length) {
+                                this._createTone(validNotes[idx + offset], t, holdDur);
+                            }
+                        });
+                    }
+                }
             }
         }
     }
@@ -852,7 +895,7 @@ class AudioEngine {
         let baseTime = 0;
         const maskedPattern = this.getMaskedPattern();
         for(let stepNumber=0; stepNumber < this.seqPattern.length; stepNumber++) {
-            if (this.kickEnabled && stepNumber % 4 === 0) {
+            if (this.kickEnabled && stepNumber % 4 === 0 && includeEffects) {
                 this._playKick(baseTime, offlineCtx, finalDest);
             }
 
