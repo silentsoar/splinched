@@ -652,8 +652,8 @@ class AudioEngine {
             let mMicroTiming = step.microTiming || 0;
 
             if (mActive) {
-                // Note Repeat (Ratchet)
-                if (repeatLikelihood > 0 && Math.random() < repeatLikelihood) {
+                // Note Repeat (Ratchet) - Only for notes <= 2 steps
+                if (repeatLikelihood > 0 && Math.random() < repeatLikelihood && (step.duration || 1) <= 2) {
                     // Randomly choose 2, 3, or 4 ratchets
                     mRatchets = [2, 2, 2, 3, 3, 4][Math.floor(Math.random() * 6)];
                 }

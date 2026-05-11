@@ -831,7 +831,7 @@ function generateAlgorithmicPattern(strategy) {
             if (Math.random() < density) {
                 let duration = Math.random() < 0.2 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, len - i);
-                let isChord = duration > 1 && Math.random() < 0.4;
+                let isChord = duration >= 3 && Math.random() < 0.4;
                 let interval = (Math.abs(lastLeap) >= 3) ? (lastLeap > 0 ? -1 - Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2)) : (Math.random() < 0.6 ? Math.floor(Math.random() * 5) - 2 : (Math.random() > 0.5 ? 3 : -3));
                 if (Math.abs(interval) >= 3) lastLeap = interval; else lastLeap = 0;
                 currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + interval));
@@ -847,7 +847,7 @@ function generateAlgorithmicPattern(strategy) {
             if (Math.random() < density) {
                 let duration = Math.random() < 0.2 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, len - i);
-                let isChord = duration > 1 && Math.random() < 0.4;
+                let isChord = duration >= 3 && Math.random() < 0.4;
                 const scaleJump = [1, 2, 4, 7][Math.floor(Math.random() * 4)] * (Math.random() > 0.5 ? 1 : -1);
                 currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + scaleJump));
                 const sliceId = findBestSlice(currentIdx);
@@ -866,7 +866,7 @@ function generateAlgorithmicPattern(strategy) {
             if (rhythmicPattern[i].active) {
                 let duration = Math.random() < 0.15 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, len - i);
-                let isChord = duration > 1 && Math.random() < 0.3;
+                let isChord = duration >= 3 && Math.random() < 0.3;
                 const currentIdx = rootIdx + arpeggio[arpIdx % arpeggio.length];
                 arpIdx++;
                 const sliceId = findBestSlice(currentIdx);
@@ -883,7 +883,7 @@ function generateAlgorithmicPattern(strategy) {
             if (isPulse && (Math.random() < density * 1.5)) {
                 let duration = [2, 3, 4, 6][Math.floor(Math.random() * 4)];
                 duration = Math.min(duration, len - i);
-                let isChord = Math.random() < 0.8;
+                let isChord = duration >= 3 && Math.random() < 0.8;
                 const currentIdx = rootIdx + chordTones[Math.floor(Math.random() * chordTones.length)] + (Math.floor(i / 8) * 2);
                 const sliceId = findBestSlice(currentIdx);
                 steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
@@ -898,7 +898,7 @@ function generateAlgorithmicPattern(strategy) {
             if (Math.random() < density) {
                 let duration = Math.random() < 0.2 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, len - i);
-                let isChord = duration > 1 && Math.random() < 0.4;
+                let isChord = duration >= 3 && Math.random() < 0.4;
                 const stayDir = Math.random() < 0.7;
                 const dir = stayDir ? lastDir : -lastDir;
                 const amount = [1, 1, 2, 3][Math.floor(Math.random() * 4)];
@@ -915,7 +915,7 @@ function generateAlgorithmicPattern(strategy) {
             if (Math.random() < density * 1.2) {
                 let duration = Math.random() < 0.25 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, len - i);
-                let isChord = duration > 1 && Math.random() < 0.5;
+                let isChord = duration >= 3 && Math.random() < 0.5;
                 const currentIdx = Math.floor(Math.random() * validNotes.length);
                 const sliceId = findBestSlice(currentIdx);
                 steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
@@ -942,7 +942,7 @@ function generateAlgorithmicPattern(strategy) {
             const source = isSecondHalf ? halfSteps[len - 1 - j] : halfSteps[j];
             if (source.active) {
                 const sliceId = findBestSlice(source.idx);
-                const isChord = source.duration > 1 && Math.random() < 0.4;
+                const isChord = source.duration >= 3 && Math.random() < 0.4;
                 steps.push({ step: j, active: true, duration: source.duration, isChord, sliceId, melodicOffset: getOffset(source.idx, sliceId) });
                 for (let k = 1; k < source.duration; k++) steps.push({ step: j + k, active: false });
                 j += (source.duration - 1);
@@ -956,7 +956,7 @@ function generateAlgorithmicPattern(strategy) {
             if (Math.random() < density * 1.2) {
                 let duration = (isPedal && Math.random() > 0.5) ? 2 : 1;
                 duration = Math.min(duration, len - j);
-                const isChord = duration > 1 && Math.random() < 0.5;
+                const isChord = duration >= 3 && Math.random() < 0.5;
                 const targetIdx = isPedal ? rootIdx : (currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + Math.floor(Math.random() * 3) - 1)));
                 const sliceId = findBestSlice(targetIdx);
                 steps.push({ step: j, active: true, duration, isChord, sliceId, melodicOffset: getOffset(targetIdx, sliceId) });
@@ -969,7 +969,7 @@ function generateAlgorithmicPattern(strategy) {
             const isActive = ((j & (j >> 2)) % 3 === 0) && (Math.random() < density * 1.5);
             if (isActive) {
                 let duration = (j % 4 === 0) ? 2 : 1;
-                const isChord = duration > 1 && Math.random() < 0.4;
+                const isChord = duration >= 3 && Math.random() < 0.4;
                 const currentIdx = rootIdx + ((j ^ (j >> 3)) % 12);
                 const sliceId = findBestSlice(currentIdx);
                 steps.push({ step: j, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
@@ -1216,7 +1216,6 @@ function renderSequencerGrid() {
         
         if (duration > 1) {
             stepEl.style.gridColumn = `span ${duration}`;
-            stepEl.classList.add('extended');
             if (stepData.isChord) stepEl.classList.add('chord');
         }
 
