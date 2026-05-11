@@ -1468,14 +1468,27 @@ function renderSequencerGrid() {
 
         // Visual grouping based on meter
         const stepsPerBeat = engine.stepsPerBeat || 4;
-        let grouping = stepsPerBeat;
-        if (engine.currentMeter === '6/8') grouping = 3;
+        let stepsPerBar = stepsPerBeat * 4;
+        if (engine.currentMeter === '3/4') stepsPerBar = stepsPerBeat * 3;
+        if (engine.currentMeter === '5/4') stepsPerBar = stepsPerBeat * 5;
+        if (engine.currentMeter === '6/8') stepsPerBar = 6;
+        if (engine.currentMeter === '7/4') stepsPerBar = stepsPerBeat * 7;
         
-        if (Math.floor(i / grouping) % 2 === 1) {
-            stepEl.style.background = 'rgba(255, 255, 255, 0.03)';
+        const barIndex = Math.floor(i / stepsPerBar);
+        const beatIndex = Math.floor(i / stepsPerBeat);
+        
+        // Alternating bar shading
+        if (barIndex % 2 === 1) {
+            stepEl.style.background = 'rgba(255, 255, 255, 0.04)';
+        } else {
+            stepEl.style.background = 'rgba(255, 255, 255, 0.01)';
         }
-        if (i % grouping === 0) {
-            stepEl.style.borderLeft = '1px solid rgba(255, 255, 255, 0.15)';
+
+        // Delineate bars and beats with borders
+        if (i % stepsPerBar === 0) {
+            stepEl.style.borderLeft = '2px solid rgba(255, 255, 255, 0.25)';
+        } else if (i % stepsPerBeat === 0) {
+            stepEl.style.borderLeft = '1px solid rgba(255, 255, 255, 0.1)';
         }
         
         if (duration > 1) {
