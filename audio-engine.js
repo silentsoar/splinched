@@ -3,6 +3,42 @@
  * Handles Web Audio API processing, chopping algorithms, and the step sequencer scheduler.
  */
 
+const TIMBRE_CONFIGS = {
+    'Harmonic': { type: 'sine', type2: 'triangle', detune: 5, lowPass: 1200, attack: 0.2, release: 1.0 },
+    'Brownian': { type: 'triangle', type2: 'sine', detune: 2, lowPass: 800, attack: 0.05, release: 0.3 },
+    'Markov': { type: 'square', type2: 'sine', detune: 0, lowPass: 400, attack: 0.01, release: 0.1 },
+    'Stochastic': { type: 'square', type2: 'sawtooth', detune: 50, lowPass: 5000, attack: 0.005, release: 0.05 },
+    'Mirror': { type: 'sawtooth', type2: 'sawtooth', detune: 10, lowPass: 1500, attack: 0.01, release: 0.1 },
+    'Pedal': { type: 'sine', type2: 'sawtooth', detune: 3, lowPass: 600, attack: 1.5, release: 2.0 },
+    'Bitwise': { type: 'square', type2: null, detune: 0, lowPass: 10000, attack: 0.005, release: 0.1 },
+    'Intervallic': { type: 'triangle', type2: 'sine', detune: 4, lowPass: 2000, attack: 0.02, release: 0.4 },
+    'Euclidean': { type: 'square', type2: 'triangle', detune: 12, lowPass: 3000, attack: 0.005, release: 0.1 },
+    'Cellular': { type: 'sine', type2: 'triangle', detune: 7, lowPass: 1000, attack: 0.5, release: 1.5 },
+    'Fibonacci': { type: 'sawtooth', type2: 'square', detune: 5, lowPass: 2500, attack: 0.05, release: 0.5 },
+    'Anchor': { type: 'sine', type2: 'sine', detune: 0, lowPass: 300, attack: 0.1, release: 0.5 },
+    'Acid': { type: 'sawtooth', type2: null, detune: 0, lowPass: 800, attack: 0.01, release: 0.1, Q: 10 },
+    'Phasing': { type: 'sine', type2: null, detune: 0, lowPass: 4000, attack: 0.01, release: 0.1 },
+    'Motif': { type: 'sine', type2: 'square', detune: 24, lowPass: 3000, attack: 0.02, release: 0.2 },
+    'Pendulum': { type: 'triangle', type2: 'sine', detune: 0, lowPass: 1000, attack: 0.1, release: 0.5 },
+    'Drill': { type: 'sawtooth', type2: 'sine', detune: 2, lowPass: 500, attack: 0.05, release: 0.2 },
+    'Dubstep': { type: 'sawtooth', type2: 'square', detune: 15, lowPass: 1000, attack: 0.02, release: 0.2, wobble: true },
+    'Trance': { type: 'sawtooth', type2: 'sawtooth', detune: 25, lowPass: 3000, attack: 0.1, release: 0.4 },
+    'House': { type: 'square', type2: 'triangle', detune: 0, lowPass: 1500, attack: 0.01, release: 0.1 },
+    'Vapor': { type: 'triangle', type2: 'sine', detune: 10, lowPass: 1200, attack: 0.3, release: 0.8 },
+    'Synthwave': { type: 'sawtooth', type2: 'sine', detune: 5, lowPass: 2000, attack: 0.1, release: 0.5 },
+    'Garage': { type: 'sine', type2: 'square', detune: 40, lowPass: 800, attack: 0.02, release: 0.2 },
+    'Samba': { type: 'triangle', type2: null, detune: 0, lowPass: 4000, attack: 0.01, release: 0.05 },
+    'Industrial': { type: 'square', type2: 'sawtooth', detune: 100, lowPass: 1500, attack: 0.01, release: 0.1 },
+    'Trap': { type: 'sine', type2: null, detune: 0, lowPass: 300, attack: 0.05, release: 0.3 },
+    'Folk': { type: 'triangle', type2: 'sine', detune: 1, lowPass: 2500, attack: 0.05, release: 0.4 },
+    'Disco': { type: 'square', type2: 'square', detune: 5, lowPass: 2000, attack: 0.02, release: 0.2 },
+    'Grime': { type: 'square', type2: null, detune: 0, lowPass: 600, attack: 0.01, release: 0.1 },
+    'Neo-Soul': { type: 'sine', type2: 'triangle', detune: 2, lowPass: 1200, attack: 0.05, release: 0.5 },
+    'Classical': { type: 'triangle', type2: 'sine', detune: 0, lowPass: 3000, attack: 0.1, release: 0.5 },
+    'Neuro': { type: 'sawtooth', type2: 'square', detune: 12, lowPass: 800, attack: 0.01, release: 0.2, res: 5 },
+    'default': { type: 'triangle', type2: null, detune: 0, lowPass: 5000, attack: 0.02, release: 0.1 }
+};
+
 class AudioEngine {
     constructor() {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -40,6 +76,9 @@ class AudioEngine {
         // Musical config
         this.musicalKey = "C";
         this.musicalMode = "ionian";
+        this.musicalOctave = 0;
+        this.stepsPerBeat = 4;
+        this.currentMeter = "4/4";
 
         // Global ADSR
         this.adsr = { attack: 0.02, decay: 0.15, sustain: 0.0, release: 0.08 };
@@ -47,15 +86,32 @@ class AudioEngine {
         this.allSlices = {};
         this.activeAlgo = 'transient';
         this.padMapping = Array.from({length: 16}, (_, i) => i);
-        this.toneEnabled = false;
+        this.toneLevel = 0.2;
         this.chordsEnabled = true;
-        this.sampleEnabled = true;
+        this.sampleLevel = 1.0;
         this._cachedMaskedPattern = null;
         this._lastMaskParams = "";
 
         this.fxEnabled = true;
         this.smartCompEnabled = false;
         this._setupEffects();
+    }
+
+    stopAllNodes() {
+        const fadeTime = 0.025; // 25ms soft fade for total smoothness
+        const now = this.ctx.currentTime;
+        this.activeSources.forEach(item => {
+            try {
+                if (item.gain) {
+                    item.gain.gain.cancelScheduledValues(now);
+                    item.gain.gain.setTargetAtTime(0, now, 0.01);
+                }
+                if (item.source) {
+                    item.source.stop(now + fadeTime);
+                }
+            } catch(e) {}
+        });
+        this.activeSources.clear();
     }
 
     _setupEffects() {
@@ -92,13 +148,13 @@ class AudioEngine {
         this.reverbGain = this.ctx.createGain();
         this.reverbGain.gain.value = 0.3;
 
-        // 5. Compressor
+        // 5. Compressor (Safety Limiter)
         this.compressor = this.ctx.createDynamicsCompressor();
-        this.compressor.threshold.value = 0; 
+        this.compressor.threshold.value = -3; 
         this.compressor.ratio.value = 12;
-        this.compressor.knee.value = 30;
+        this.compressor.knee.value = 5;
         this.compressor.attack.value = 0.003;
-        this.compressor.release.value = 0.25;
+        this.compressor.release.value = 0.1;
 
         // 6. Routing
         // Source -> EQ Low -> EQ Mid -> EQ High -> Distortion -> Compressor -> Output
@@ -207,6 +263,15 @@ class AudioEngine {
         this.musicalOctave = parseInt(octave) || 0;
     }
 
+    setMeter(meter) {
+        this.currentMeter = meter;
+        if (meter === '3/4') this.stepsPerBeat = 4; // 3 beats of 4 16ths
+        else if (meter === '5/4') this.stepsPerBeat = 4;
+        else if (meter === '7/4') this.stepsPerBeat = 4;
+        else if (meter === '6/8') this.stepsPerBeat = 3; // 2 beats of 3 8ths
+        else this.stepsPerBeat = 4; // Default 4/4
+    }
+
     // --- Slicing Algorithms ---
 
     async processAllAlgorithms(targetSlices) {
@@ -238,6 +303,24 @@ class AudioEngine {
             newCuts.push(cuts[cuts.length - 1]);
             cuts = newCuts;
         }
+
+        // Enforce 100ms minimum duration
+        const minDur = 0.1; // 100ms
+        let filteredCuts = [cuts[0]];
+        let lastValidCut = cuts[0];
+
+        for (let i = 1; i < cuts.length - 1; i++) {
+            const dur = cuts[i] - lastValidCut;
+            const remaining = cuts[cuts.length - 1] - cuts[i];
+            
+            // Only add this cut if it's far enough from the last one AND far enough from the end
+            if (dur >= minDur && remaining >= minDur) {
+                filteredCuts.push(cuts[i]);
+                lastValidCut = cuts[i];
+            }
+        }
+        filteredCuts.push(cuts[cuts.length - 1]);
+        cuts = filteredCuts;
 
         this.slices = [];
         for (let i = 0; i < cuts.length - 1; i++) {
@@ -378,10 +461,6 @@ class AudioEngine {
         const slice = this.slices.find(s => s.id === sliceId);
         if (!slice || !this.buffer) return null;
 
-        if (this.globalChoke && ctx === this.ctx) {
-            this.stopAllNodes();
-        }
-
         const source = ctx.createBufferSource();
         source.buffer = this.buffer;
         source.playbackRate.value = playbackRate;
@@ -426,34 +505,34 @@ class AudioEngine {
             playDur = audibleDur; // Allow playing past the physical end since we loop
         }
 
-        gainNode.gain.setValueAtTime(0, time);
+        gainNode.gain.setValueAtTime(0.0001, time);
         
-        // Attack
         let peakTime = time + A;
         if (peakTime > time + holdDur) peakTime = time + holdDur;
-        gainNode.gain.linearRampToValueAtTime(1.0 * gainMult, peakTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.7 * gainMult, peakTime);
         
         // Decay
         let decayEndTime = peakTime + D;
         if (decayEndTime > time + holdDur) decayEndTime = time + holdDur;
-        gainNode.gain.linearRampToValueAtTime(effectiveSustain * gainMult, decayEndTime);
+        gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, effectiveSustain * gainMult), decayEndTime);
         
         // Sustain (hold S until holdDur)
-        gainNode.gain.setValueAtTime(effectiveSustain * gainMult, time + holdDur);
+        gainNode.gain.setValueAtTime(Math.max(0.0001, effectiveSustain * gainMult), time + holdDur);
         
         // Release
         const releaseEndTime = time + holdDur + R;
-        gainNode.gain.linearRampToValueAtTime(0.0001, releaseEndTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, releaseEndTime);
 
         source.connect(gainNode);
         gainNode.connect(dest);
 
         const playId = Math.random().toString(36).substr(2, 9);
         
+        const item = { source, gain: gainNode };
         if (ctx === this.ctx) {
-            this.activeSources.add(source);
+            this.activeSources.add(item);
             source.onended = () => {
-                this.activeSources.delete(source);
+                this.activeSources.delete(item);
                 if (this.onSliceStop) this.onSliceStop(playId);
             };
         }
@@ -468,27 +547,40 @@ class AudioEngine {
         return source;
     }
 
-    _createTone(midiNote, time, holdDur = 0.2, ctx = this.ctx, destination = null, gainMult = 1.0, isLong = false) {
+
+
+    _createTone(midiNote, time, holdDur = 0.2, ctx = this.ctx, destination = null, gainMult = 1.0, isLong = false, strategy = 'default') {
+        const config = TIMBRE_CONFIGS[strategy] || TIMBRE_CONFIGS['default'];
         const dest = destination || (this.fxEnabled ? this.eqLow : this.globalGain);
         if (midiNote < 0) return null;
         
         const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
-        
-        if (this.globalChoke && ctx === this.ctx) {
-            this.stopAllNodes();
-        }
+
+        // Filter for timbre
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setTargetAtTime(config.lowPass, time, 0.01);
+        filter.Q.setTargetAtTime(config.Q || 1, time, 0.01);
 
         const osc = ctx.createOscillator();
-        osc.type = 'triangle';
+        osc.type = config.type;
         osc.frequency.setValueAtTime(freq, time);
+
+        let osc2 = null;
+        if (config.type2) {
+            osc2 = ctx.createOscillator();
+            osc2.type = config.type2;
+            osc2.frequency.setValueAtTime(freq, time);
+            osc2.detune.setValueAtTime(config.detune || 0, time);
+        }
 
         const gainNode = ctx.createGain();
         
-        // ADSR Envelope
-        let A = this.adsr.attack;
+        // Use genre attack/release as base, then apply global ADSR deviations
+        let A = config.attack || this.adsr.attack;
         let D = this.adsr.decay;
         const S = this.adsr.sustain;
-        let R = this.adsr.release;
+        let R = config.release || this.adsr.release;
 
         // Boost sustain only for true long notes
         let effectiveSustain = S;
@@ -506,37 +598,34 @@ class AudioEngine {
             audibleDur = Math.min(holdDur, A + D);
         }
 
-        gainNode.gain.setValueAtTime(0, time);
+        gainNode.gain.setValueAtTime(0.0001, time);
+        gainNode.gain.exponentialRampToValueAtTime(0.4 * gainMult, time + A);
+        gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, effectiveSustain * 0.4 * gainMult), time + A + D);
+        gainNode.gain.setValueAtTime(Math.max(0.0001, effectiveSustain * 0.4 * gainMult), time + holdDur);
         
-        // Attack
-        let peakTime = time + A;
-        if (peakTime > time + holdDur) peakTime = time + holdDur;
-        gainNode.gain.linearRampToValueAtTime(0.7 * gainMult, peakTime);
-        
-        // Decay
-        let decayEndTime = peakTime + D;
-        if (decayEndTime > time + holdDur) decayEndTime = time + holdDur;
-        gainNode.gain.linearRampToValueAtTime(effectiveSustain * 0.7 * gainMult, decayEndTime);
-        
-        // Sustain
-        gainNode.gain.setValueAtTime(effectiveSustain * 0.7 * gainMult, time + holdDur);
-        
-        // Release
         const releaseEndTime = time + holdDur + R;
-        gainNode.gain.linearRampToValueAtTime(0.0001, releaseEndTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, releaseEndTime);
 
-        osc.connect(gainNode);
+        osc.connect(filter);
+        if (osc2) osc2.connect(filter);
+        filter.connect(gainNode);
         gainNode.connect(dest);
 
+        const item1 = { source: osc, gain: gainNode };
+        const item2 = osc2 ? { source: osc2, gain: gainNode } : null;
         if (ctx === this.ctx) {
-            this.activeSources.add(osc);
+            this.activeSources.add(item1);
+            if (item2) this.activeSources.add(item2);
             osc.onended = () => {
-                this.activeSources.delete(osc);
+                this.activeSources.delete(item1);
+                if (item2) this.activeSources.delete(item2);
             };
         }
 
         osc.start(time);
+        if (osc2) osc2.start(time);
         osc.stop(releaseEndTime);
+        if (osc2) osc2.stop(releaseEndTime);
         
         return osc;
     }
@@ -696,6 +785,9 @@ class AudioEngine {
     }
 
     _scheduleNote(stepNumber, baseTime) {
+        if (this.globalChoke) {
+            this.stopAllNodes();
+        }
         let time = baseTime;
         const secondsPerBeat = 60.0 / this.seqBpm;
         const stepDuration = 0.25 * secondsPerBeat;
@@ -711,7 +803,7 @@ class AudioEngine {
             setTimeout(() => this.onStepPlay(stepNumber), (time - this.ctx.currentTime) * 1000);
         }
 
-        if (this.kickEnabled && stepNumber % 4 === 0) {
+        if (this.kickEnabled && stepNumber % this.stepsPerBeat === 0) {
             this._playKick(baseTime, this.ctx, this.globalGain);
         }
 
@@ -763,8 +855,8 @@ class AudioEngine {
             const volMult = isChordTrigger ? 0.45 : 1.0;
 
             // Independent layering: Sample and Tone can both be enabled
-            if (this.sampleEnabled) {
-                const triggerSample = (pitchRate) => this._createSource(sliceId, t, pitchRate, this.ctx, null, holdDur, volMult, isLong);
+            if (this.sampleLevel > 0) {
+                const triggerSample = (pitchRate) => this._createSource(sliceId, t, pitchRate, this.ctx, null, holdDur, volMult * this.sampleLevel, isLong);
                 triggerSample(rate);
                 
                 if (isChordTrigger) {
@@ -777,7 +869,7 @@ class AudioEngine {
                 }
             }
 
-            if (this.toneEnabled && slice.pitch.midi > 0) {
+            if (this.toneLevel > 0 && slice.pitch.midi > 0) {
                 // Determine the target MIDI note
                 let targetMidi = slice.pitch.midi;
                 if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
@@ -792,7 +884,8 @@ class AudioEngine {
                     }
                 }
                 
-                this._createTone(targetMidi, t, holdDur, this.ctx, null, volMult, isLong);
+                const strategy = this.seqPattern.strategy || 'default';
+                this._createTone(targetMidi, t, holdDur, this.ctx, null, volMult * this.toneLevel, isLong, strategy);
 
                 if (isChordTrigger) {
                     const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
@@ -801,7 +894,7 @@ class AudioEngine {
                         // Diatonic thirds and fifths
                         [2, 4].forEach(offset => {
                             if (idx + offset < validNotes.length) {
-                                this._createTone(validNotes[idx + offset], t, holdDur, this.ctx, null, volMult, isLong);
+                                this._createTone(validNotes[idx + offset], t, holdDur, this.ctx, null, volMult * this.toneLevel, isLong, strategy);
                             }
                         });
                     }
@@ -909,7 +1002,7 @@ class AudioEngine {
             for(let stepNumber=0; stepNumber < this.seqPattern.length; stepNumber++) {
                 const baseTime = loopOffset + (stepNumber * stepDuration);
                 
-                if (this.kickEnabled && stepNumber % 4 === 0 && includeEffects) {
+                if (this.kickEnabled && stepNumber % this.stepsPerBeat === 0 && includeEffects) {
                     this._playKick(baseTime, offlineCtx, finalDest);
                 }
 
@@ -950,16 +1043,16 @@ class AudioEngine {
                     let t = time + (r * ratchetSpacing);
                     const holdDur = ratchetSpacing * 0.9;
                     
-                    if (this.sampleEnabled) {
-                        this._createSource(sliceId, t, rate, offlineCtx, finalDest, holdDur, volMult, isLong);
+                    if (this.sampleLevel > 0) {
+                        this._createSource(sliceId, t, rate, offlineCtx, finalDest, holdDur, volMult * this.sampleLevel, isLong);
                         if (isChordTrigger) {
                             [3, 4, 7].forEach(semi => {
                                 const chordRate = rate * Math.pow(2, semi / 12);
-                                this._createSource(sliceId, t, chordRate, offlineCtx, finalDest, holdDur, volMult, isLong);
+                                this._createSource(sliceId, t, chordRate, offlineCtx, finalDest, holdDur, volMult * this.sampleLevel, isLong);
                             });
                         }
                     }
-                    if (this.toneEnabled && slice.pitch.midi > 0) {
+                    if (this.toneLevel > 0 && slice.pitch.midi > 0) {
                         let targetMidi = slice.pitch.midi;
                         if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
                             const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
@@ -971,14 +1064,15 @@ class AudioEngine {
                                 targetMidi = Math.max(24, Math.min(102, targetMidi));
                             }
                         }
-                        this._createTone(targetMidi, t, holdDur, offlineCtx, finalDest, volMult, isLong);
+                        const strategy = this.seqPattern.strategy || 'default';
+                        this._createTone(targetMidi, t, holdDur, offlineCtx, finalDest, volMult * this.toneLevel, isLong, strategy);
                         if (isChordTrigger) {
                             const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
                             let idx = validNotes.indexOf(targetMidi);
                             if (idx !== -1) {
                                 [2, 4].forEach(offset => {
                                     if (idx + offset < validNotes.length) {
-                                        this._createTone(validNotes[idx + offset], t, holdDur, offlineCtx, finalDest, volMult, isLong);
+                                        this._createTone(validNotes[idx + offset], t, holdDur, offlineCtx, finalDest, volMult * this.toneLevel, isLong, strategy);
                                     }
                                 });
                             }

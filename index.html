@@ -136,9 +136,22 @@
                                     <!-- Populated by JS -->
                                 </select>
                             </div>
-                            <div class="param-group" style="width: 100px;">
-                                <label for="seq-bpm">BPM</label>
+                            <div class="param-group" style="width: 80px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <label for="seq-bpm">BPM</label>
+                                    <button id="btn-auto-bpm" class="btn btn-secondary btn-auto-bpm-active" title="Auto BPM per genre" style="padding: 0 0.3rem; font-size: 0.6rem; height: 16px; line-height: 14px; min-width: 32px;">Auto</button>
+                                </div>
                                 <input type="number" id="seq-bpm" value="120" min="40" max="300" class="custom-select">
+                            </div>
+                            <div class="param-group" style="width: 80px;">
+                                <label for="seq-meter">Meter</label>
+                                <select id="seq-meter" class="custom-select">
+                                    <option value="4/4">4/4</option>
+                                    <option value="3/4">3/4</option>
+                                    <option value="5/4">5/4</option>
+                                    <option value="6/8">6/8</option>
+                                    <option value="7/4">7/4</option>
+                                </select>
                             </div>
                             <div class="param-group" style="width: 80px;">
                                 <label for="algo-len">Steps</label>
@@ -165,28 +178,28 @@
                             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; width: 100%; align-items: center;">
                                 <button id="btn-algo-harmonic" class="btn btn-secondary flex-1" title="Harmonic Gates"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-layer-group"></i> Chord</button>
+                                        class="fas fa-layer-group"></i> Ambient</button>
                                 <button id="btn-algo-brownian" class="btn btn-secondary flex-1" title="Brownian Contour"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-wave-square"></i> Brown</button>
+                                        class="fas fa-wave-square"></i> Jazz</button>
                                 <button id="btn-algo-markov" class="btn btn-secondary flex-1" title="Markov Chain"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-project-diagram"></i> Mark</button>
+                                        class="fas fa-project-diagram"></i> Hip Hop</button>
                                 <button id="btn-algo-stochastic" class="btn btn-secondary flex-1"
                                     title="Stochastic Chaos" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-bolt"></i> IDM</button>
+                                        class="fas fa-bolt"></i> Glitch</button>
                                 <button id="btn-algo-mirror" class="btn btn-secondary flex-1" title="Mirror Symmetry"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-arrows-alt-h"></i> Mirror</button>
+                                        class="fas fa-arrows-alt-h"></i> Techno</button>
                                 <button id="btn-algo-pedal" class="btn btn-secondary flex-1" title="Pedal Point"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-anchor"></i>
-                                    Pedal</button>
+                                    Drone</button>
                                 <button id="btn-algo-bitwise" class="btn btn-secondary flex-1" title="Bitwise Logic"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-microchip"></i>
-                                    Bit</button>
+                                    Chiptune</button>
                                 <button id="btn-algo-intervallic" class="btn btn-secondary flex-1"
                                     title="Intervallic Jumps" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-arrows-alt-v"></i> Jump</button>
+                                        class="fas fa-arrows-alt-v"></i> Math Rock</button>
                             </div>
                         </div>
 
@@ -194,28 +207,86 @@
                             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; width: 100%; align-items: center;">
                                 <button id="btn-algo-euclidean" class="btn btn-secondary flex-1"
                                     title="Euclidean Arpeggio" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-shapes"></i> Euc</button>
+                                        class="fas fa-shapes"></i> Afrobeat</button>
                                 <button id="btn-algo-cellular" class="btn btn-secondary flex-1"
                                     title="Cellular Automata" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-border-all"></i> Cell</button>
+                                        class="fas fa-border-all"></i> Soundscape</button>
                                 <button id="btn-algo-fibonacci" class="btn btn-secondary flex-1"
                                     title="Fibonacci Sequence" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-infinity"></i> Fibo</button>
+                                        class="fas fa-infinity"></i> Prog Rock</button>
                                 <button id="btn-algo-anchor" class="btn btn-secondary flex-1" title="Anchor Drone"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-anchor"></i>
-                                    Anch</button>
+                                    Reggae</button>
                                 <button id="btn-algo-acid" class="btn btn-secondary flex-1" title="Acid Runs"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-flask"></i>
                                     Acid</button>
                                 <button id="btn-algo-phasing" class="btn btn-secondary flex-1"
                                     title="Minimalist Phasing" style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
-                                        class="fas fa-sync-alt"></i> Phase</button>
+                                        class="fas fa-sync-alt"></i> Minimal</button>
                                 <button id="btn-algo-motif" class="btn btn-secondary flex-1" title="Motif Box"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-box"></i>
-                                    Motif</button>
+                                    Pop</button>
                                 <button id="btn-algo-pedalum" class="btn btn-secondary flex-1" title="Pendulum Swings"
                                     style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i class="fas fa-clock"></i>
-                                    Pend</button>
+                                    Lo-Fi</button>
+                            </div>
+                        </div>
+
+                        <div class="param-row mt-05rem">
+                            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; width: 100%; align-items: center;">
+                                <button id="btn-algo-drill" class="btn btn-secondary flex-1" title="Drill Slides"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-skull"></i> Drill</button>
+                                <button id="btn-algo-dubstep" class="btn btn-secondary flex-1" title="Wobble Half-Time"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-volume-up"></i> Dubstep</button>
+                                <button id="btn-algo-trance" class="btn btn-secondary flex-1" title="Trance Arps"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-star"></i> Trance</button>
+                                <button id="btn-algo-house" class="btn btn-secondary flex-1" title="4/4 Syncopation"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-house-user"></i> House</button>
+                                <button id="btn-algo-vapor" class="btn btn-secondary flex-1" title="Vapor Leaps"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-cloud"></i> Vapor</button>
+                                <button id="btn-algo-synthwave" class="btn btn-secondary flex-1" title="Driving Bass"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-car"></i> Synthwave</button>
+                                <button id="btn-algo-garage" class="btn btn-secondary flex-1" title="Swung Garage"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-wrench"></i> Garage</button>
+                                <button id="btn-algo-samba" class="btn btn-secondary flex-1" title="Samba Sync"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-drum"></i> Samba</button>
+                            </div>
+                        </div>
+
+                        <div class="param-row mt-05rem">
+                            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; width: 100%; align-items: center;">
+                                <button id="btn-algo-industrial" class="btn btn-secondary flex-1" title="Harsh Repetition"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-industry"></i> Industrial</button>
+                                <button id="btn-algo-trap" class="btn btn-secondary flex-1" title="Trap Ratchets"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-fire"></i> Trap</button>
+                                <button id="btn-algo-folk" class="btn btn-secondary flex-1" title="Simple Diatonic"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-leaf"></i> Folk</button>
+                                <button id="btn-algo-disco" class="btn btn-secondary flex-1" title="Octave Jumps"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-compact-disc"></i> Disco</button>
+                                <button id="btn-algo-grime" class="btn btn-secondary flex-1" title="Sparse Melodies"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-ghost"></i> Grime</button>
+                                <button id="btn-algo-neosoul" class="btn btn-secondary flex-1" title="Late Chords"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-heart"></i> Neo-Soul</button>
+                                <button id="btn-algo-classical" class="btn btn-secondary flex-1" title="Classical Arps"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-scroll"></i> Classical</button>
+                                <button id="btn-algo-neuro" class="btn btn-secondary flex-1" title="Neuro Evolution"
+                                    style="font-size: 0.7rem; padding: 0.5rem 0.2rem;"><i
+                                        class="fas fa-brain"></i> Neuro</button>
                             </div>
                         </div>
 
@@ -262,13 +333,15 @@
                                 </div>
                                 <input type="range" id="kick-level" min="0" max="100" value="30">
                             </div>
-                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
-                                <label style="margin: 0;">Sample</label>
-                                <input type="checkbox" id="seq-sample" class="custom-checkbox" checked>
+                            <div class="param-group">
+                                <label for="seq-sample-level">Sample <span id="val-sample-level"
+                                        class="hint">100%</span></label>
+                                <input type="range" id="seq-sample-level" min="0" max="100" value="100">
                             </div>
-                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
-                                <label style="margin: 0;">Tone</label>
-                                <input type="checkbox" id="seq-tone" class="custom-checkbox">
+                            <div class="param-group">
+                                <label for="seq-tone-level">Tone <span id="val-tone-level"
+                                        class="hint">20%</span></label>
+                                <input type="range" id="seq-tone-level" min="0" max="100" value="20">
                             </div>
                             <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
                                 <label style="margin: 0;">Chords</label>

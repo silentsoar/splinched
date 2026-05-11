@@ -1029,3 +1029,9 @@ input[type=range]::-webkit-slider-runnable-track {
     border-top-right-radius: 10px;
     border-bottom-right-radius: 10px;
 }
+
+.btn-auto-bpm-active {
+    background: var(--accent-primary) !important;
+    color: white !important;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
