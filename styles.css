@@ -533,13 +533,15 @@ input[type=range]::-webkit-slider-runnable-track {
     left: 2px;
     background: var(--accent-danger);
     color: white;
-    font-size: 0.6rem;
-    padding: 1px 3px;
+    font-size: 0.55rem;
+    padding: 1px 4px;
     border-radius: 3px;
     font-weight: 800;
     line-height: 1;
     pointer-events: none;
     z-index: 5;
+    white-space: nowrap;
+    width: auto;
 }
 
 .micro-dot {
@@ -575,18 +577,6 @@ input[type=range]::-webkit-slider-runnable-track {
     animation: stepRoll 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.ratchet-badge {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    background: var(--accent-danger);
-    color: white;
-    font-size: 0.55rem;
-    font-weight: bold;
-    padding: 1px 3px;
-    border-radius: 3px;
-    line-height: 1;
-}
 
 /* Pads Grid */
 .pads-section {
