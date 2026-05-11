@@ -829,7 +829,7 @@ function generateAlgorithmicPattern(strategy) {
         let lastLeap = 0;
         while (i < len) {
             if (Math.random() < density) {
-                let duration = Math.random() < 0.2 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                let duration = Math.random() < 0.2 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, len - i);
                 let isChord = duration > 1 && Math.random() < 0.4;
                 let interval = (Math.abs(lastLeap) >= 3) ? (lastLeap > 0 ? -1 - Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2)) : (Math.random() < 0.6 ? Math.floor(Math.random() * 5) - 2 : (Math.random() > 0.5 ? 3 : -3));
@@ -845,7 +845,7 @@ function generateAlgorithmicPattern(strategy) {
         let currentIdx = Math.floor(validNotes.length / 2) - 7;
         while (i < len) {
             if (Math.random() < density) {
-                let duration = Math.random() < 0.2 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                let duration = Math.random() < 0.2 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, len - i);
                 let isChord = duration > 1 && Math.random() < 0.4;
                 const scaleJump = [1, 2, 4, 7][Math.floor(Math.random() * 4)] * (Math.random() > 0.5 ? 1 : -1);
@@ -881,7 +881,7 @@ function generateAlgorithmicPattern(strategy) {
         while (i < len) {
             const isPulse = (i % 8 === 0 || i % 8 === 3 || i % 8 === 6);
             if (isPulse && (Math.random() < density * 1.5)) {
-                let duration = [2, 2, 3, 4][Math.floor(Math.random() * 4)];
+                let duration = [2, 3, 4, 6][Math.floor(Math.random() * 4)];
                 duration = Math.min(duration, len - i);
                 let isChord = Math.random() < 0.8;
                 const currentIdx = rootIdx + chordTones[Math.floor(Math.random() * chordTones.length)] + (Math.floor(i / 8) * 2);
@@ -896,7 +896,7 @@ function generateAlgorithmicPattern(strategy) {
         let lastDir = 1;
         while (i < len) {
             if (Math.random() < density) {
-                let duration = Math.random() < 0.2 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                let duration = Math.random() < 0.2 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, len - i);
                 let isChord = duration > 1 && Math.random() < 0.4;
                 const stayDir = Math.random() < 0.7;
@@ -913,7 +913,7 @@ function generateAlgorithmicPattern(strategy) {
     } else if (strategy === 'Stochastic') {
         while (i < len) {
             if (Math.random() < density * 1.2) {
-                let duration = Math.random() < 0.25 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                let duration = Math.random() < 0.25 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, len - i);
                 let isChord = duration > 1 && Math.random() < 0.5;
                 const currentIdx = Math.floor(Math.random() * validNotes.length);
@@ -929,7 +929,7 @@ function generateAlgorithmicPattern(strategy) {
         let currentIdx = Math.floor(validNotes.length / 2) - 7;
         while (hi < len / 2) {
             if (Math.random() < density) {
-                let duration = Math.random() < 0.2 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
+                let duration = Math.random() < 0.2 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, Math.floor(len / 2) - hi);
                 currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + Math.floor(Math.random() * 5) - 2));
                 halfSteps.push({ active: true, idx: currentIdx, duration });
@@ -1820,7 +1820,7 @@ function loadSettings() {
             if (settings.tone !== undefined) toneCheck.checked = settings.tone;
             else toneCheck.checked = false;
             if (settings.chords !== undefined) chordsCheck.checked = settings.chords;
-            else chordsCheck.checked = false;
+            else chordsCheck.checked = true;
             
             // Sync engine state
             engine.sampleEnabled = sampleCheck.checked;

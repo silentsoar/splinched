@@ -48,7 +48,7 @@ class AudioEngine {
         this.activeAlgo = 'transient';
         this.padMapping = Array.from({length: 16}, (_, i) => i);
         this.toneEnabled = false;
-        this.chordsEnabled = false;
+        this.chordsEnabled = true;
         this.sampleEnabled = true;
         this._cachedMaskedPattern = null;
         this._lastMaskParams = "";
@@ -373,7 +373,7 @@ class AudioEngine {
         this.activeSources.clear();
     }
 
-    _createSource(sliceId, time, playbackRate = 1.0, ctx = this.ctx, destination = null, holdDurOverride = -1) {
+    _createSource(sliceId, time, playbackRate = 1.0, ctx = this.ctx, destination = null, holdDurOverride = 0, gainMult = 1.0, isLong = false) {
         const dest = destination || (this.fxEnabled ? this.eqLow : this.globalGain);
         const slice = this.slices.find(s => s.id === sliceId);
         if (!slice || !this.buffer) return null;
@@ -402,12 +402,11 @@ class AudioEngine {
         }
 
         // Base slice duration (how long the note is logically "held" before release)
-        const isExtended = holdDurOverride > 0;
-        const holdDur = isExtended ? holdDurOverride : (slice.duration / playbackRate);
+        const holdDur = holdDurOverride > 0 ? holdDurOverride : (slice.duration / playbackRate);
         
-        // Boost sustain for extended notes if it's currently low
+        // Boost sustain only for true long notes (>1 step) if it's currently low
         let effectiveSustain = S;
-        if (isExtended && S < 0.7) effectiveSustain = 0.7;
+        if (isLong && S < 0.7) effectiveSustain = 0.7;
 
         let audibleDur = holdDur + R;
         // If sustain is zero, the sound dies completely after Attack + Decay phase
@@ -419,8 +418,8 @@ class AudioEngine {
         const maxAvailableDur = (this.buffer.duration - slice.start) / playbackRate;
         let playDur = Math.min(audibleDur, maxAvailableDur);
 
-        // If extended, enable looping to sustain short slices
-        if (isExtended) {
+        // If long, enable looping to sustain short slices
+        if (isLong) {
             source.loop = true;
             source.loopStart = slice.start;
             source.loopEnd = slice.end;
@@ -432,15 +431,15 @@ class AudioEngine {
         // Attack
         let peakTime = time + A;
         if (peakTime > time + holdDur) peakTime = time + holdDur;
-        gainNode.gain.linearRampToValueAtTime(1.0, peakTime);
+        gainNode.gain.linearRampToValueAtTime(1.0 * gainMult, peakTime);
         
         // Decay
         let decayEndTime = peakTime + D;
         if (decayEndTime > time + holdDur) decayEndTime = time + holdDur;
-        gainNode.gain.linearRampToValueAtTime(effectiveSustain, decayEndTime);
+        gainNode.gain.linearRampToValueAtTime(effectiveSustain * gainMult, decayEndTime);
         
         // Sustain (hold S until holdDur)
-        gainNode.gain.setValueAtTime(effectiveSustain, time + holdDur);
+        gainNode.gain.setValueAtTime(effectiveSustain * gainMult, time + holdDur);
         
         // Release
         const releaseEndTime = time + holdDur + R;
@@ -469,7 +468,7 @@ class AudioEngine {
         return source;
     }
 
-    _createTone(midiNote, time, holdDur = 0.2, ctx = this.ctx, destination = null) {
+    _createTone(midiNote, time, holdDur = 0.2, ctx = this.ctx, destination = null, gainMult = 1.0, isLong = false) {
         const dest = destination || (this.fxEnabled ? this.eqLow : this.globalGain);
         if (midiNote < 0) return null;
         
@@ -491,9 +490,9 @@ class AudioEngine {
         const S = this.adsr.sustain;
         let R = this.adsr.release;
 
-        // Boost sustain for longer notes
+        // Boost sustain only for true long notes
         let effectiveSustain = S;
-        if (holdDur > 0.3 && S < 0.7) effectiveSustain = 0.7;
+        if (isLong && S < 0.7) effectiveSustain = 0.7;
 
         if (this.adsrDeviation !== 0) {
             const mult = 1.0 + (Math.random() * this.adsrDeviation);
@@ -512,15 +511,15 @@ class AudioEngine {
         // Attack
         let peakTime = time + A;
         if (peakTime > time + holdDur) peakTime = time + holdDur;
-        gainNode.gain.linearRampToValueAtTime(0.7, peakTime);
+        gainNode.gain.linearRampToValueAtTime(0.7 * gainMult, peakTime);
         
         // Decay
         let decayEndTime = peakTime + D;
         if (decayEndTime > time + holdDur) decayEndTime = time + holdDur;
-        gainNode.gain.linearRampToValueAtTime(effectiveSustain * 0.7, decayEndTime);
+        gainNode.gain.linearRampToValueAtTime(effectiveSustain * 0.7 * gainMult, decayEndTime);
         
         // Sustain
-        gainNode.gain.setValueAtTime(effectiveSustain * 0.7, time + holdDur);
+        gainNode.gain.setValueAtTime(effectiveSustain * 0.7 * gainMult, time + holdDur);
         
         // Release
         const releaseEndTime = time + holdDur + R;
@@ -757,12 +756,16 @@ class AudioEngine {
             let t = time + (r * ratchetSpacing);
             const holdDur = ratchetSpacing * 0.9; // Small gap between ratchets
             
+            const isLong = noteSteps > 1;
+            const isChordTrigger = this.chordsEnabled && stepData.isChord;
+            const volMult = isChordTrigger ? 0.45 : 1.0;
+
             // Independent layering: Sample and Tone can both be enabled
             if (this.sampleEnabled) {
-                const triggerSample = (pitchRate) => this._createSource(sliceId, t, pitchRate, this.ctx, null, holdDur);
+                const triggerSample = (pitchRate) => this._createSource(sliceId, t, pitchRate, this.ctx, null, holdDur, volMult, isLong);
                 triggerSample(rate);
                 
-                if (this.chordsEnabled && stepData.isChord) {
+                if (isChordTrigger) {
                     // Play major/minor third and fifth based on scale
                     const intervals = [3, 4, 7]; // Basic intervals for color
                     intervals.forEach(semi => {
@@ -785,16 +788,16 @@ class AudioEngine {
                     }
                 }
                 
-                this._createTone(targetMidi, t, holdDur);
+                this._createTone(targetMidi, t, holdDur, this.ctx, null, volMult, isLong);
 
-                if (this.chordsEnabled && stepData.isChord) {
+                if (isChordTrigger) {
                     const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
                     let idx = validNotes.indexOf(targetMidi);
                     if (idx !== -1) {
                         // Diatonic thirds and fifths
                         [2, 4].forEach(offset => {
                             if (idx + offset < validNotes.length) {
-                                this._createTone(validNotes[idx + offset], t, holdDur);
+                                this._createTone(validNotes[idx + offset], t, holdDur, this.ctx, null, volMult, isLong);
                             }
                         });
                     }
