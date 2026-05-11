@@ -829,7 +829,9 @@ class AudioEngine {
         if (!this.seqPattern || this.slices.length === 0 || !this.buffer) return null;
         
         const secondsPerBeat = 60.0 / this.seqBpm;
-        const totalTime = (this.seqPattern.length * 0.25 * secondsPerBeat) + 2.0; // Add 2s tail for reverb/delay
+        const stepDuration = 0.25 * secondsPerBeat;
+        const loopDuration = this.seqPattern.length * stepDuration;
+        const totalTime = (loopDuration * 2) + 2.0; // Two loops + 2s tail for reverb/delay
         
         const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
             this.buffer.numberOfChannels, 
@@ -899,23 +901,22 @@ class AudioEngine {
             finalDest = oEqLow;
         }
 
-        let baseTime = 0;
         const maskedPattern = this.getMaskedPattern();
-        for(let stepNumber=0; stepNumber < this.seqPattern.length; stepNumber++) {
-            if (this.kickEnabled && stepNumber % 4 === 0 && includeEffects) {
-                this._playKick(baseTime, offlineCtx, finalDest);
-            }
-
-            const stepData = maskedPattern[stepNumber];
-            if (stepData && stepData.active) {
-                let time = baseTime;
-                const stepDuration = 0.25 * secondsPerBeat;
+        
+        for (let loop = 0; loop < 2; loop++) {
+            const loopOffset = loop * loopDuration;
+            
+            for(let stepNumber=0; stepNumber < this.seqPattern.length; stepNumber++) {
+                const baseTime = loopOffset + (stepNumber * stepDuration);
                 
-                if (stepNumber % 2 !== 0) {
-                    const swingDelay = (this.seqSwing * stepDuration) * 0.5;
-                    time += swingDelay;
+                if (this.kickEnabled && stepNumber % 4 === 0 && includeEffects) {
+                    this._playKick(baseTime, offlineCtx, finalDest);
                 }
-                
+
+                const stepData = maskedPattern[stepNumber];
+                if (!stepData || !stepData.active) continue;
+
+                let time = baseTime;
                 if (stepData.microTiming) {
                     time += stepData.microTiming;
                 }
@@ -926,41 +927,65 @@ class AudioEngine {
 
                 let rate = 1.0;
                 if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined && slice.pitch.midi > 0) {
-                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
+                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
                     const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
                     let idx = validNotes.indexOf(closestMidi);
                     if (idx !== -1) {
                         idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
-                        const targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                        let targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                        targetMidi = Math.max(24, Math.min(102, targetMidi));
                         rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
                     }
                 }
 
                 let ratchets = stepData.ratchets || 1;
-                const ratchetSpacing = stepDuration / ratchets;
-                
+                const noteSteps = stepData.duration || 1;
+                const totalNoteDur = noteSteps * stepDuration;
+                const ratchetSpacing = totalNoteDur / ratchets;
+                const isLong = noteSteps > 1;
+                const isChordTrigger = this.chordsEnabled && stepData.isChord;
+                const volMult = isChordTrigger ? 0.45 : 1.0;
+
                 for (let r = 0; r < ratchets; r++) {
                     let t = time + (r * ratchetSpacing);
+                    const holdDur = ratchetSpacing * 0.9;
                     
                     if (this.sampleEnabled) {
-                        this._createSource(sliceId, t, rate, offlineCtx, finalDest);
+                        this._createSource(sliceId, t, rate, offlineCtx, finalDest, holdDur, volMult, isLong);
+                        if (isChordTrigger) {
+                            [3, 4, 7].forEach(semi => {
+                                const chordRate = rate * Math.pow(2, semi / 12);
+                                this._createSource(sliceId, t, chordRate, offlineCtx, finalDest, holdDur, volMult, isLong);
+                            });
+                        }
                     }
                     if (this.toneEnabled && slice.pitch.midi > 0) {
                         let targetMidi = slice.pitch.midi;
                         if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
-                            const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
+                            const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
                             const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
                             let idx = validNotes.indexOf(closestMidi);
                             if (idx !== -1) {
                                 idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
                                 targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                                targetMidi = Math.max(24, Math.min(102, targetMidi));
                             }
                         }
-                        this._createTone(targetMidi, t, ratchetSpacing, offlineCtx, finalDest);
+                        this._createTone(targetMidi, t, holdDur, offlineCtx, finalDest, volMult, isLong);
+                        if (isChordTrigger) {
+                            const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
+                            let idx = validNotes.indexOf(targetMidi);
+                            if (idx !== -1) {
+                                [2, 4].forEach(offset => {
+                                    if (idx + offset < validNotes.length) {
+                                        this._createTone(validNotes[idx + offset], t, holdDur, offlineCtx, finalDest, volMult, isLong);
+                                    }
+                                });
+                            }
+                        }
                     }
                 }
             }
-            baseTime += 0.25 * secondsPerBeat;
         }
 
         const renderedBuffer = await offlineCtx.startRendering();
