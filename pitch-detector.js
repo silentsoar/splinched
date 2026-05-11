@@ -185,13 +185,13 @@ class ScaleQuantizer {
         locrian:    [0, 1, 3, 5, 6, 8, 10]
     };
 
-    static getValidMidiNotes(rootNoteName, modeName) {
+    static getValidMidiNotes(rootNoteName, modeName, minOctave = -1, maxOctave = 9) {
         const rootIndex = this.NOTES.indexOf(rootNoteName);
         const intervals = this.MODES[modeName];
         let validNotes = new Set();
         
-        // Generate valid MIDI notes across the entire 0-127 range
-        for (let octave = -1; octave <= 9; octave++) {
+        // Generate valid MIDI notes within requested octave range
+        for (let octave = minOctave; octave <= maxOctave; octave++) {
             const baseMidi = (octave + 1) * 12 + rootIndex;
             intervals.forEach(interval => {
                 const midi = baseMidi + interval;

@@ -795,7 +795,7 @@ function generateAlgorithmicPattern(strategy) {
     if (!engine.buffer || engine.slices.length === 0) return;
     
     const len = parseInt(algoLenSelect.value) || 64;
-    const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode);
+    const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode, 2, 4);
     
     let steps = [];
     const density = engine.seqDensity || 0.5;
@@ -1230,7 +1230,22 @@ function renderSequencerGrid() {
             const sliceId = sliceIdLookup % engine.slices.length;
             const slice = engine.slices[sliceId];
             if (slice) {
-                const noteName = (slice.pitch && slice.pitch.noteName) ? slice.pitch.noteName : '--';
+                let noteName = (slice.pitch && slice.pitch.noteName) ? slice.pitch.noteName : '--';
+                
+                // If melodic pattern, calculate the actual transposed note name
+                if (pattern.type === 'melodic' && stepData.melodicOffset !== undefined && slice.pitch.midi > 0) {
+                    const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode, 2, 4);
+                    const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, engine.musicalKey, engine.musicalMode);
+                    let idx = validNotes.indexOf(closestMidi);
+                    if (idx !== -1) {
+                        idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                        let targetMidi = validNotes[idx] + (engine.musicalOctave * 12);
+                        // Clamp to same range as audio engine for visual consistency
+                        targetMidi = Math.max(24, Math.min(102, targetMidi));
+                        noteName = PitchDetector.midiToNoteName(targetMidi);
+                    }
+                }
+                
                 sliceInfoStr = `S${sliceId + 1} ${noteName}`;
             }
         }
@@ -1645,7 +1660,7 @@ async function exportMidiChords() {
     await new Promise(resolve => setTimeout(resolve, 50));
 
     try {
-        const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode);
+        const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode, 2, 4);
         const blob = MidiExporter.generateChordsMidiBlob(
             pattern, 
             parseInt(bpmInput.value), 

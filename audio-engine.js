@@ -736,12 +736,14 @@ class AudioEngine {
         let rate = 1.0;
         if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
             if (slice.pitch.midi > 0) {
-                const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
+                const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
                 const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
                 let idx = validNotes.indexOf(closestMidi);
                 if (idx !== -1) {
                     idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
-                    const targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                    let targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                    // Clamp to a safe musical range (Octave 0 to 8) to prevent extreme rates/pitches
+                    targetMidi = Math.max(24, Math.min(102, targetMidi));
                     rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
                 }
             }
@@ -779,19 +781,21 @@ class AudioEngine {
                 // Determine the target MIDI note
                 let targetMidi = slice.pitch.midi;
                 if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
-                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
+                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
                     const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
                     let idx = validNotes.indexOf(closestMidi);
                     if (idx !== -1) {
                         idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
                         targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                        // Clamp to safe range (C0 to F#6)
+                        targetMidi = Math.max(24, Math.min(102, targetMidi));
                     }
                 }
                 
                 this._createTone(targetMidi, t, holdDur, this.ctx, null, volMult, isLong);
 
                 if (isChordTrigger) {
-                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode);
+                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
                     let idx = validNotes.indexOf(targetMidi);
                     if (idx !== -1) {
                         // Diatonic thirds and fifths
