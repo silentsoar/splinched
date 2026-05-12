@@ -6,22 +6,22 @@
 const engine = new AudioEngine();
 
 const GENRE_BPMS = {
-    'Harmonic': 90, 'Brownian': 110, 'Markov': 95, 'Stochastic': 140,
-    'Mirror': 128, 'Pedal': 60, 'Bitwise': 160, 'Intervallic': 145,
-    'Euclidean': 115, 'Cellular': 70, 'Fibonacci': 135, 'Anchor': 80,
-    'Acid': 132, 'Phasing': 120, 'Motif': 118, 'Pendulum': 85,
-    'Drill': 140, 'Dubstep': 140, 'Trance': 138, 'House': 124,
-    'Vapor': 90, 'Synthwave': 110, 'Garage': 130, 'Samba': 105,
-    'Industrial': 150, 'Trap': 140, 'Folk': 110, 'Disco': 120,
-    'Grime': 140, 'Neo-Soul': 90, 'Classical': 100, 'Neuro': 172,
-    'Bossa Nova': 120, 'Cumbia': 96, 'Dancehall': 100, 'Flamenco': 130,
-    'Polyrhythmic': 120, 'Rumba': 112, 'Bhangra': 105, 'Footwork': 160,
-    'Drum & Bass': 174, 'Jungle': 165, 'Breakbeat': 130, 'Future Bass': 150,
-    'Hardstyle': 150, 'IDM': 125, 'Psytrance': 142, 'Slap House': 124,
-    'Cinematic': 90, 'Dungeon Synth': 80, 'Electroacoustic': 100, 'Generative Drone': 60,
-    'Krautrock': 126, 'Post-Rock': 130, 'Shoegaze': 110, 'Spectral': 85,
-    'Hyperpop': 150, 'Jersey Club': 135, 'Phonk': 120, 'R&B': 75,
-    'Synth-Pop': 118, 'UK Drill': 142, 'UK Funky': 130, 'Witch House': 115
+    'Harmonic': 75, 'Brownian': 95, 'Markov': 80, 'Stochastic': 125,
+    'Mirror': 113, 'Pedal': 45, 'Bitwise': 145, 'Intervallic': 130,
+    'Euclidean': 100, 'Cellular': 55, 'Fibonacci': 120, 'Anchor': 65,
+    'Acid': 117, 'Phasing': 105, 'Motif': 103, 'Pendulum': 70,
+    'Drill': 125, 'Dubstep': 125, 'Trance': 123, 'House': 109,
+    'Vapor': 75, 'Synthwave': 95, 'Garage': 115, 'Samba': 90,
+    'Industrial': 135, 'Trap': 125, 'Folk': 95, 'Disco': 105,
+    'Grime': 125, 'Neo-Soul': 75, 'Classical': 85, 'Neuro': 157,
+    'Bossa Nova': 105, 'Cumbia': 81, 'Dancehall': 85, 'Flamenco': 115,
+    'Polyrhythmic': 105, 'Rumba': 97, 'Bhangra': 90, 'Footwork': 145,
+    'Drum & Bass': 159, 'Jungle': 150, 'Breakbeat': 115, 'Future Bass': 135,
+    'Hardstyle': 135, 'IDM': 110, 'Psytrance': 127, 'Slap House': 109,
+    'Cinematic': 75, 'Dungeon Synth': 65, 'Electroacoustic': 85, 'Generative Drone': 45,
+    'Krautrock': 111, 'Post-Rock': 115, 'Shoegaze': 95, 'Spectral': 70,
+    'Hyperpop': 135, 'Jersey Club': 120, 'Phonk': 105, 'R&B': 60,
+    'Synth-Pop': 103, 'UK Drill': 127, 'UK Funky': 115, 'Witch House': 100
 };
 
 // DOM Elements
@@ -2629,7 +2629,7 @@ function loadSettings() {
             else toneLevelSlider.value = fromLogPercent(0.04);
 
             if (settings.chords !== undefined) chordsCheck.checked = settings.chords;
-            else chordsCheck.checked = true;
+            else chordsCheck.checked = false;
 
             if (moreLongNotesCheck) {
                 moreLongNotesCheck.checked = !!settings.moreLongNotes;

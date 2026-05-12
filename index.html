@@ -274,55 +274,9 @@
                                 <label for="seq-swing">Swing <span id="val-swing" class="hint">0%</span></label>
                                 <input type="range" id="seq-swing" min="0" max="100" value="0">
                             </div>
-                            <div class="param-group">
-                                <div style="display: flex; align-items: center; justify-content: space-between;">
-                                    <label for="kick-level" style="margin: 0;">Kick <span id="val-kick"
-                                            class="hint">15%</span></label>
-                                    <div style="display: flex; align-items: center; gap: 0.25rem;">
-                                        <label for="kick-drum" style="margin:0; font-size: 0.8rem;">On</label>
-                                        <input type="checkbox" id="kick-drum" class="custom-checkbox" checked
-                                            title="Enable Kick">
-                                    </div>
-                                </div>
-                                <input type="range" id="kick-level" min="0" max="100" value="39">
-                            </div>
-                            <div class="param-group">
-                                <label for="seq-sample-level">Sample <span id="val-sample-level"
-                                        class="hint">100%</span></label>
-                                <input type="range" id="seq-sample-level" min="0" max="100" value="100">
-                            </div>
-                            <div class="param-group">
-                                <label for="seq-tone-level">Tone <span id="val-tone-level"
-                                        class="hint">4%</span></label>
-                                <input type="range" id="seq-tone-level" min="0" max="100" value="20">
-                            </div>
-                            <div class="param-group" style="width: 110px;">
-                                <div style="display: flex; align-items: center; justify-content: space-between;">
-                                    <label for="seq-timbre" style="margin: 0;">Timbre</label>
-                                    <button id="btn-auto-timbre" class="btn btn-secondary btn-auto-bpm-active" title="Auto Timbre per genre" style="padding: 0 0.3rem; font-size: 0.6rem; height: 16px; line-height: 14px; min-width: 32px;">Auto</button>
-                                </div>
-                                <select id="seq-timbre" class="custom-select" style="font-size: 0.7rem; padding: 0.2rem 0.4rem;">
-                                    <option value="pure-sine" selected>Pure Sine</option>
-                                    <option value="fm-pluck">FM Pluck</option>
-                                    <option value="sub-bass">Sub-Bass</option>
-                                    <option value="analog-saw">Analog Saw</option>
-                                    <option value="square-lead">Square Lead</option>
-                                    <option value="triangle-flute">Triangle Flute</option>
-                                    <option value="detuned-supersaw">Supersaw</option>
-                                    <option value="electric-piano">E-Piano</option>
-                                    <option value="glockenspiel">Glockenspiel</option>
-                                    <option value="organ-drawbar">Organ</option>
-                                    <option value="muted-brass">Muted Brass</option>
-                                    <option value="chiptune-pulse">Chiptune</option>
-                                    <option value="ghostly-pad">Ghost Pad</option>
-                                    <option value="plucked-string">Plucked</option>
-                                    <option value="hollow-bell">Hollow Bell</option>
-                                    <option value="acid-synth">Acid Synth</option>
-                                </select>
-                            </div>
                             <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
                                 <label style="margin: 0;">Chords</label>
-                                <input type="checkbox" id="seq-tone-chords" class="custom-checkbox" checked>
+                                <input type="checkbox" id="seq-tone-chords" class="custom-checkbox">
                             </div>
                             <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
                                 <label style="margin: 0;" for="seq-more-long-notes">More long notes</label>
@@ -448,6 +402,60 @@
                         <!-- Specific algorithm params container -->
                         <div id="algo-params-container" class="mt-1rem">
                             <!-- Populated dynamically -->
+                        </div>
+
+                        <div class="sub-header mt-1rem">
+                            <h3>Tone Generator & Mix</h3>
+                        </div>
+                        <div class="param-row">
+                            <div class="param-group flex-1">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <label for="kick-level" style="margin: 0;">Kick <span id="val-kick"
+                                            class="hint">15%</span></label>
+                                    <div style="display: flex; align-items: center; gap: 0.25rem;">
+                                        <label for="kick-drum" style="margin:0; font-size: 0.8rem;">On</label>
+                                        <input type="checkbox" id="kick-drum" class="custom-checkbox" checked
+                                            title="Enable Kick">
+                                    </div>
+                                </div>
+                                <input type="range" id="kick-level" min="0" max="100" value="39">
+                            </div>
+                            <div class="param-group flex-1">
+                                <label for="seq-sample-level">Sample <span id="val-sample-level"
+                                        class="hint">100%</span></label>
+                                <input type="range" id="seq-sample-level" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param-row">
+                            <div class="param-group flex-1">
+                                <label for="seq-tone-level">Tone <span id="val-tone-level"
+                                        class="hint">4%</span></label>
+                                <input type="range" id="seq-tone-level" min="0" max="100" value="20">
+                            </div>
+                            <div class="param-group flex-1">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <label for="seq-timbre" style="margin: 0;">Timbre</label>
+                                    <button id="btn-auto-timbre" class="btn btn-secondary btn-auto-bpm-active" title="Auto Timbre per genre" style="padding: 0 0.3rem; font-size: 0.6rem; height: 16px; line-height: 14px; min-width: 32px;">Auto</button>
+                                </div>
+                                <select id="seq-timbre" class="custom-select" style="font-size: 0.7rem; padding: 0.2rem 0.4rem;">
+                                    <option value="pure-sine" selected>Pure Sine</option>
+                                    <option value="fm-pluck">FM Pluck</option>
+                                    <option value="sub-bass">Sub-Bass</option>
+                                    <option value="analog-saw">Analog Saw</option>
+                                    <option value="square-lead">Square Lead</option>
+                                    <option value="triangle-flute">Triangle Flute</option>
+                                    <option value="detuned-supersaw">Supersaw</option>
+                                    <option value="electric-piano">E-Piano</option>
+                                    <option value="glockenspiel">Glockenspiel</option>
+                                    <option value="organ-drawbar">Organ</option>
+                                    <option value="muted-brass">Muted Brass</option>
+                                    <option value="chiptune-pulse">Chiptune</option>
+                                    <option value="ghostly-pad">Ghost Pad</option>
+                                    <option value="plucked-string">Plucked</option>
+                                    <option value="hollow-bell">Hollow Bell</option>
+                                    <option value="acid-synth">Acid Synth</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div class="sub-header mt-1rem">
