@@ -210,6 +210,7 @@ const valSampleLevel = document.getElementById('val-sample-level');
 const toneLevelSlider = document.getElementById('seq-tone-level');
 const valToneLevel = document.getElementById('val-tone-level');
 const chordsCheck = document.getElementById('seq-tone-chords');
+const moreLongNotesCheck = document.getElementById('seq-more-long-notes');
 const partToggle = document.getElementById('seq-part-toggle');
 const labelChorus = document.getElementById('label-chorus');
 const labelVerse = document.getElementById('label-verse');
@@ -814,6 +815,15 @@ function setupEventListeners() {
         engine.chordsEnabled = e.target.checked;
         saveSettings();
     });
+
+    if (moreLongNotesCheck) {
+        moreLongNotesCheck.addEventListener('change', (e) => {
+            engine.moreLongNotes = e.target.checked;
+            saveSettings();
+            const currentStrategy = Object.keys(algoButtons).find(k => algoButtons[k] && algoButtons[k].classList.contains('btn-primary')) || 'Harmonic';
+            generateAlgorithmicPattern(currentStrategy);
+        });
+    }
 
     if (partToggle) {
         const updatePartToggleUI = () => {
@@ -1796,6 +1806,32 @@ function generateAlgorithmicPattern(strategy) {
         });
     }
 
+    if (engine.moreLongNotes) {
+        let sIdx = 0;
+        while (sIdx < steps.length) {
+            const currentStep = steps[sIdx];
+            if (currentStep && currentStep.active) {
+                if (Math.random() < 0.75) {
+                    const candidateDurations = [2, 3, 4, 6];
+                    const chosenDuration = candidateDurations[Math.floor(Math.random() * candidateDurations.length)];
+                    const actualDuration = Math.min(chosenDuration, len - sIdx);
+                    if (actualDuration > (currentStep.duration || 1)) {
+                        currentStep.duration = actualDuration;
+                        if (actualDuration >= 3 && Math.random() < 0.4) currentStep.isChord = true;
+                        for (let k = 1; k < actualDuration; k++) {
+                            if (sIdx + k < steps.length) {
+                                steps[sIdx + k] = { step: sIdx + k, active: false };
+                            }
+                        }
+                    }
+                }
+                sIdx += (currentStep.duration || 1);
+            } else {
+                sIdx++;
+            }
+        }
+    }
+
     const newPat = {
         id: 'algo_' + Date.now(),
         name: strategy + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
@@ -2535,7 +2571,8 @@ function saveSettings() {
         eqHigh: fxEqHigh.value,
         autoBpm: autoBpmEnabled,
         timbre: timbreSelect ? timbreSelect.value : 'pure-sine',
-        autoTimbre: autoTimbreEnabled
+        autoTimbre: autoTimbreEnabled,
+        moreLongNotes: moreLongNotesCheck ? moreLongNotesCheck.checked : false
     };
     localStorage.setItem('splinchedSettings', JSON.stringify(settings));
 }
@@ -2593,11 +2630,16 @@ function loadSettings() {
 
             if (settings.chords !== undefined) chordsCheck.checked = settings.chords;
             else chordsCheck.checked = true;
+
+            if (moreLongNotesCheck) {
+                moreLongNotesCheck.checked = !!settings.moreLongNotes;
+            }
             
             // Sync engine state
             engine.sampleLevel = toLogPercent(parseInt(sampleLevelSlider.value));
             engine.toneLevel = toLogPercent(parseInt(toneLevelSlider.value));
             engine.chordsEnabled = chordsCheck.checked;
+            engine.moreLongNotes = moreLongNotesCheck ? moreLongNotesCheck.checked : false;
             if (partToggle) {
                 partToggle.checked = (settings.part === 'verse');
                 engine.songPart = settings.part || 'chorus';
