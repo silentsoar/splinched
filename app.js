@@ -1810,20 +1810,25 @@ function generateAlgorithmicPattern(strategy) {
         const popProgressionOffsets = [0, 7, 5, 9];
         const catchyRhythm = [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0];
         
+        const sourceSteps = [...steps];
         let chorusMotif = [];
         for (let k = 0; k < 16; k++) {
-            let srcStep = steps[k] || { active: false };
+            let srcStep = sourceSteps[k] || { active: false };
             let isActive = catchyRhythm[k] ? (Math.random() < density * 1.5) : (srcStep.active && Math.random() < 0.4);
             if (isActive) {
                 let targetDegree = popDegrees[Math.floor(Math.random() * popDegrees.length)];
-                chorusMotif[k] = { active: true, degree: targetDegree };
+                let duration = srcStep.duration && srcStep.duration > 1 ? srcStep.duration : (Math.random() < 0.3 ? [2, 3, 4][Math.floor(Math.random() * 3)] : 1);
+                chorusMotif[k] = { active: true, duration: duration, degree: targetDegree };
             } else {
                 chorusMotif[k] = { active: false };
             }
         }
-        chorusMotif[0] = { active: true, degree: 0 };
+        if (!chorusMotif[0] || !chorusMotif[0].active) {
+            chorusMotif[0] = { active: true, duration: Math.random() < 0.5 ? 2 : 1, degree: 0 };
+        }
         
-        for (let j = 0; j < len; j++) {
+        let j = 0;
+        while (j < len) {
             let mStep = chorusMotif[j % 16];
             let currentBar = Math.floor(j / 16) % popProgressionOffsets.length;
             let progressionShift = popProgressionOffsets[currentBar];
@@ -1833,15 +1838,23 @@ function generateAlgorithmicPattern(strategy) {
                 let currentIdx = baseRootIdx + (isChord ? progressionShift : mStep.degree);
                 currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx));
                 const sliceId = findBestSlice(currentIdx);
+                
+                let actualDuration = Math.min(mStep.duration || 1, len - j);
                 steps[j] = {
                     step: j,
                     active: true,
+                    duration: actualDuration,
                     isChord: isChord,
                     sliceId: sliceId,
                     melodicOffset: getOffset(currentIdx, sliceId)
                 };
+                for (let d = 1; d < actualDuration; d++) {
+                    if (j + d < len) steps[j + d] = { step: j + d, active: false };
+                }
+                j += actualDuration;
             } else {
                 steps[j] = { step: j, active: false };
+                j++;
             }
         }
     }
