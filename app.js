@@ -1804,6 +1804,46 @@ function generateAlgorithmicPattern(strategy) {
                 step.isChord = false; // Thin out most chords to make Verse sound sparser
             }
         });
+    } else {
+        const baseRootIdx = Math.floor(validNotes.length / 2) - 12;
+        const popDegrees = [0, 2, 4, 7, 9];
+        const popProgressionOffsets = [0, 7, 5, 9];
+        const catchyRhythm = [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0];
+        
+        let chorusMotif = [];
+        for (let k = 0; k < 16; k++) {
+            let srcStep = steps[k] || { active: false };
+            let isActive = catchyRhythm[k] ? (Math.random() < density * 1.5) : (srcStep.active && Math.random() < 0.4);
+            if (isActive) {
+                let targetDegree = popDegrees[Math.floor(Math.random() * popDegrees.length)];
+                chorusMotif[k] = { active: true, degree: targetDegree };
+            } else {
+                chorusMotif[k] = { active: false };
+            }
+        }
+        chorusMotif[0] = { active: true, degree: 0 };
+        
+        for (let j = 0; j < len; j++) {
+            let mStep = chorusMotif[j % 16];
+            let currentBar = Math.floor(j / 16) % popProgressionOffsets.length;
+            let progressionShift = popProgressionOffsets[currentBar];
+            
+            if (mStep && mStep.active) {
+                let isChord = (j % 8 === 0) || (j % 16 === 0);
+                let currentIdx = baseRootIdx + (isChord ? progressionShift : mStep.degree);
+                currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx));
+                const sliceId = findBestSlice(currentIdx);
+                steps[j] = {
+                    step: j,
+                    active: true,
+                    isChord: isChord,
+                    sliceId: sliceId,
+                    melodicOffset: getOffset(currentIdx, sliceId)
+                };
+            } else {
+                steps[j] = { step: j, active: false };
+            }
+        }
     }
 
     if (engine.moreLongNotes) {

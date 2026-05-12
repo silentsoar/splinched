@@ -20,7 +20,8 @@ The native secondary tone generator features a curated bank of **16 highly tailo
 *   **Digital & Sub-Heavy Models**: *FM Pluck, Sub-Bass, Chiptune Pulse, Ghostly Pad, Hollow Bell, Acid Synth*.
 *   **Topological Soft-Fading**: Multi-node networks incorporate localized soft-killing fade envelopes guaranteeing pop-free releases and clean tails during rapid sequence transitions.
 
-### 3. Intelligent UI & Automation Routing
+### 3. Intelligent UI Layout & Automation Routing
+*   **Tone Generator & Mix Grouping**: Unified Sound Design Configuration column hosting consolidated audio routing controls (**Kick, Sample, Tone, and Timbre**) directly adjacent to primary global parameter settings.
 *   **Auto-Timbre Assignment Matrix**: Instantly maps active algorithms to stylistically corresponding synthesis textures dynamically (e.g., automatically matching *UK Drill* patterns with rich *Sub-Bass* layers or *Slap House* with punchy *FM Plucks*), with manual dropdown overrides fully preserved.
 *   **Matrix Selection Interface**: Displays all 64 generation triggers inside an elegant, compact CSS Grid container sorted purely alphabetically for maximum user readability and workflow speed.
 *   **Downbeat Synchronization**: Smart playback triggering automatically routes internal Kick drums perfectly onto downbeats once per bar or individual primary metric subdivisions across standard and odd time signatures (`3/4`, `4/4`, `5/4`, `6/8`, and `7/4`).
@@ -35,9 +36,9 @@ Transform source audio into distinct playable stems using 6 customizable slicing
 *   **Random**: Serendipitous granular sub-chopping.
 
 ### 5. Sound Design & Polyphonic Envelopes
-*   **Unconstrained Single-Step Envelopes**: Short sequence triggers execute full Attack, Decay, and Release envelope phases entirely unhindered by mechanical step boundaries, eliminating musical tail choking.
+*   **Universal Duration Control ("More long notes")**: Decoupled length inflation switch dynamically post-processes step outputs across all algorithms, scaling short steps into sustained phrases spanning up to 6 sequence grid units with intermediate frame automatic cleanup.
+*   **Unconstrained Single-Step Envelopes**: Short sequence triggers execute full Attack, Decay, and Release envelope phases entirely unhindered by mechanical step boundaries, eliminating tail choking.
 *   **Gain Compensation**: Automated normalization layer manages amplitude loads between delicate monophonic lines and complex polyphonic output.
-*   **Long-Note Persistence**: Support for sustained phrases spanning up to 6 sequence grid steps with automatic continuous crossfade looping.
 
 ### 6. Fully Integrated Studio FX Pipeline
 Shape your composite outputs through a comprehensive inline processing pipeline:
