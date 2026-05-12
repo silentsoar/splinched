@@ -218,7 +218,7 @@ const SLIDER_DEFAULTS = {
     'seq-micro-timing': 0,
     'seq-probability': 100,
     'seq-swing': 0,
-    'kick-level': fromLogPercent(0.3),
+    'kick-level': fromLogPercent(0.15),
     'seq-sample-level': fromLogPercent(1.0),
     'seq-tone-level': fromLogPercent(0.2),
     'adsr-deviation': 50
@@ -2106,7 +2106,7 @@ function loadSettings() {
             if (settings.swing !== undefined) seqSwing.value = fromLogPercent(settings.swing);
             if (settings.kick !== undefined) kickDrum.checked = settings.kick;
             if (settings.kickLevel !== undefined) kickLevel.value = fromLogPercent(settings.kickLevel);
-            else kickLevel.value = fromLogPercent(0.3);
+            else kickLevel.value = fromLogPercent(0.15);
 
             if (settings.sampleLevel !== undefined) sampleLevelSlider.value = settings.sampleLevel;
             else sampleLevelSlider.value = fromLogPercent(1.0);

@@ -63,7 +63,7 @@ class AudioEngine {
         this.seqProbability = 1.0;
         this.seqSwing = 0.0;
         this.kickEnabled = true;
-        this.kickLevel = 0.3;
+        this.kickLevel = 0.15;
         this.seqIsPlaying = false;
         this.seqNextNoteTime = 0.0;
         this.seqCurrentStep = 0;
