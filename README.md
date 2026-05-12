@@ -1,61 +1,69 @@
 # Splinched: Generative Polyphonic Workstation
 
-**Splinched** is a professional-grade, browser-based generative music workstation designed for sample-based composition, melodic sequencing, and harmonic exploration. It combines advanced audio chopping algorithms with a sophisticated generative engine to transform any audio file into a complex, polyphonic musical environment.
+**Splinched** is a professional-grade, browser-based generative music workstation designed for sample-based composition, deep algorithmic sequencing, and premium multi-timbre hybrid synthesis. It combines advanced audio chopping techniques with an expanded intelligent generative engine to transform any source audio file into an inspiring, high-fidelity polyphonic environment.
 
 ![Splinched Interface](file:///c:/Users/d/.gemini/antigravity/scratch/sample-chopper/preview_mockup.png)
 
 ## 🚀 Key Features
 
-### 1. Advanced Sample Chopping
-Transform audio into playable slices using 6 distinct algorithms:
-*   **Transient**: Intelligent onset detection for drums and percussion.
-*   **Grid**: Classic mathematical subdivision.
-*   **Beat-Sync**: Tempo-aware slicing for loops.
-*   **Silence**: Gap-based isolation for clean stems.
-*   **Golden Ratio**: Musically organic subdivisions.
-*   **Random**: Serendipitous rhythmic discoveries.
+### 1. Expanded Generative Sequencing Library (64 Strategies)
+A highly advanced algorithmic sequencer driven by **64 distinct generative strategies** structured into four primary stylistic groups:
+*   **Global & Rhythmic**: Native support for complex global syncopations including Latin clave maps (*Bossa Nova, Cumbia, Rumba*), Tresillo structures (*Dancehall*), rapid triplet ratcheting (*Flamenco*), and hyper-speed subdivisions (*Footwork, Bhangra, Polyrhythmic*).
+*   **Electronic & Bass**: High-energy and nonlinear sequence patterns optimized for contemporary sub-heavy subcultures (*Drum & Bass, Jungle, Breakbeat, Future Bass, Hardstyle, IDM, Psytrance, Slap House*).
+*   **Cinematic & Experimental**: Atmospheric and structural interval triggers (*Cinematic, Dungeon Synth, Electroacoustic, Generative Drone, Krautrock, Post-Rock, Shoegaze, Spectral*).
+*   **Nostalgic & Contemporary**: Stylistically specialized contours featuring micro-timed offsets, glitch bounds, and chromatic sub-leaps (*Hyperpop, Jersey Club, Phonk, R&B, Synth-Pop, UK Drill, UK Funky, Witch House*).
 
-### 2. Generative Melodic Engine
-A powerful sequencer driven by 16+ algorithmic strategies, including:
-*   **Brownian Motion & Markov Chains**: For organic, evolving melodies.
-*   **Harmonic Pulse**: For structured, chord-based rhythms.
-*   **Euclidean & Stochastic**: For mathematical and probabilistic complexity.
-*   **Mirror & Pedal**: For classical and contemporary melodic structures.
+### 2. Premium Multi-Timbre Synthesis Engine
+The native secondary tone generator features a curated bank of **16 highly tailored synthesis profiles** to inject immediate genre authenticity:
+*   **Acoustic & Electric Models**: *Electric Piano, Glockenspiel, Plucked String, Organ Drawbar, Muted Brass*.
+*   **Analog & Waveform Models**: *Analog Saw, Square Lead, Detuned Supersaw, Triangle Flute, Pure Sine*.
+*   **Digital & Sub-Heavy Models**: *FM Pluck, Sub-Bass, Chiptune Pulse, Ghostly Pad, Hollow Bell, Acid Synth*.
+*   **Topological Soft-Fading**: Multi-node networks incorporate localized soft-killing fade envelopes guaranteeing pop-free releases and clean tails during rapid sequence transitions.
 
-### 3. Polyphonic Chord System
-*   **Diatonic Generation**: Automatically generates chords that fit your selected Key and Mode.
-*   **Smart Normalization**: Integrated gain compensation ensures consistent volume between single notes and complex chords.
-*   **Range Control**: Focused composition within Octaves 2-4 with global transposition support.
+### 3. Intelligent UI & Automation Routing
+*   **Auto-Timbre Assignment Matrix**: Instantly maps active algorithms to stylistically corresponding synthesis textures dynamically (e.g., automatically matching *UK Drill* patterns with rich *Sub-Bass* layers or *Slap House* with punchy *FM Plucks*), with manual dropdown overrides fully preserved.
+*   **Matrix Selection Interface**: Displays all 64 generation triggers inside an elegant, compact CSS Grid container sorted purely alphabetically for maximum user readability and workflow speed.
+*   **Downbeat Synchronization**: Smart playback triggering automatically routes internal Kick drums perfectly onto downbeats once per bar or individual primary metric subdivisions across standard and odd time signatures (`3/4`, `4/4`, `5/4`, `6/8`, and `7/4`).
 
-### 4. Sound Design & Synthesis
-*   **Hybrid Engine**: Layer the original sample with a synchronized tone generator.
-*   **Long-Note Logic**: Support for notes spanning up to 6 steps with automatic sustain-looping.
-*   **Global ADSR**: Precision control over Attack, Decay, Sustain, and Release with real-time visual feedback.
+### 4. Advanced Sample Chopping
+Transform source audio into distinct playable stems using 6 customizable slicing algorithms:
+*   **Transient**: Intelligent onset detection for drums and complex transient hits.
+*   **Grid**: Classic mathematical linear subdivisions.
+*   **Beat-Sync**: Tempo-aware slice quantizing for synchronized loop processing.
+*   **Silence**: Amplitude gap isolation for clean individual sample extractions.
+*   **Golden Ratio**: Musically organic, non-repeating mathematical ratios.
+*   **Random**: Serendipitous granular sub-chopping.
 
-### 5. Professional FX Chain
-A fully-integrated effects pipeline:
-*   **3-Band EQ**: Clean frequency shaping.
-*   **Saturation/Distortion**: For warmth and grit.
-*   **Stereo Delay & Lush Reverb**: For spatial depth.
-*   **Dynamics Compressor**: For punch and cohesion.
+### 5. Sound Design & Polyphonic Envelopes
+*   **Unconstrained Single-Step Envelopes**: Short sequence triggers execute full Attack, Decay, and Release envelope phases entirely unhindered by mechanical step boundaries, eliminating musical tail choking.
+*   **Gain Compensation**: Automated normalization layer manages amplitude loads between delicate monophonic lines and complex polyphonic output.
+*   **Long-Note Persistence**: Support for sustained phrases spanning up to 6 sequence grid steps with automatic continuous crossfade looping.
 
-### 6. Export & Connectivity
-*   **Seamless WAV Export**: High-quality Wet and Dry exports containing two loops with overlapping tails for perfect looping.
-*   **MIDI Support**: Chromatic playback via external MIDI controllers and full MIDI sequence export (including polyphonic chord data).
+### 6. Fully Integrated Studio FX Pipeline
+Shape your composite outputs through a comprehensive inline processing pipeline:
+*   **3-Band Frequency Equalizer**: Transparent shelf/peak frequency carving.
+*   **Analog Saturation**: Soft-clipping drive for harmonic warmth.
+*   **Stereo Delay & Reverb**: Expansive multi-tap reflections and rich ambient reverb spaces.
+*   **Dynamics Compressor**: Real-time program compression summing both sampled stems and synthesized layers into a cohesive master mix.
+
+### 7. Exporting & Hardware Connectivity
+*   **Flawless Seamless Export**: Generate professional double-length Wet and Dry WAV bounces with cross-blended signal tails allowing zero-crossing seamless infinite loop integration.
+*   **Full MIDI Capabilities**: Support for external MIDI keyboard triggering with pad mapping interfaces, alongside complete multi-channel note and chord sequence extraction.
 
 ## 🛠️ Technology Stack
-*   **Core**: Vanilla JavaScript, HTML5, Semantic CSS.
-*   **Audio**: Web Audio API (Live & Offline contexts).
-*   **Intelligence**: Autocorrelation-based Pitch Detection, Scale Quantization.
-*   **Storage**: IndexedDB for audio persistence, localStorage for settings.
+*   **Core Logic**: Vanilla JavaScript, HTML5, Modular CSS Design System.
+*   **Audio Pipeline**: Native Web Audio API (Live Streaming & Offline Render Contexts).
+*   **Intelligence**: Autocorrelation Pitch Extraction, Chromatic Mode Quantization Matrices.
+*   **State Integrity**: High-performance IndexedDB binary storage alongside resilient LocalStorage parameter registries.
 
 ## 🎹 Getting Started
-1.  **Upload**: Drag and drop any audio file (WAV, MP3) into the workspace.
-2.  **Chop**: Choose an algorithm to slice your audio.
-3.  **Generate**: Click a Pattern Algorithm to create a new sequence instantly.
-4.  **Tweak**: Adjust ADSR, Effects, and Musical Config to taste.
-5.  **Export**: Save your creation as a loopable WAV or MIDI file.
+1.  **Upload**: Drag and drop any source audio file (`WAV`, `MP3`) directly into the workstation preview workspace.
+2.  **Chop**: Select an extraction algorithm to render interactive stem slices instantly.
+3.  **Audition**: Trigger individual mapped workspace pads or custom slice keymaps.
+4.  **Sequence**: Click any of the 64 available categorized genre strategies to seed new rhythmic or melodic matrices instantly.
+5.  **Sculpt**: Toggle Auto-Timbre models, refine ADSR curves, and dial in studio effects.
+6.  **Export**: Save out your final creation as an instantly loopable studio audio stem or external MIDI sequence.
 
 ---
 
-*Designed and Built for the Modern Generative Musician.*
+*Engineered for premium sonic clarity, intuitive generative exploration, and dynamic real-time workflow speed.*

@@ -826,6 +826,8 @@ function setupEventListeners() {
                 labelVerse.style.color = isVerse ? '' : 'var(--text-muted)';
             }
             saveSettings();
+            const currentStrategy = Object.keys(algoButtons).find(k => algoButtons[k] && algoButtons[k].classList.contains('btn-primary')) || 'Harmonic';
+            generateAlgorithmicPattern(currentStrategy);
         };
         partToggle.addEventListener('change', updatePartToggleUI);
         if (labelChorus) {
@@ -993,6 +995,17 @@ function generateAlgorithmicPattern(strategy) {
         const matchedTimbre = ALGO_TIMBRES[strategy];
         engine.activeTimbre = matchedTimbre;
         if (timbreSelect) timbreSelect.value = matchedTimbre;
+    }
+
+    Object.keys(algoButtons).forEach(k => {
+        if (algoButtons[k]) {
+            algoButtons[k].classList.remove('btn-primary');
+            algoButtons[k].classList.add('btn-secondary');
+        }
+    });
+    if (algoButtons[strategy]) {
+        algoButtons[strategy].classList.remove('btn-secondary');
+        algoButtons[strategy].classList.add('btn-primary');
     }
 
     const len = parseInt(algoLenSelect.value) || 64;
