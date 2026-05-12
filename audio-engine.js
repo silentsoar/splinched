@@ -3,41 +3,6 @@
  * Handles Web Audio API processing, chopping algorithms, and the step sequencer scheduler.
  */
 
-const TIMBRE_CONFIGS = {
-    'Harmonic': { type: 'sine', type2: 'triangle', detune: 5, lowPass: 1200, attack: 0.2, release: 1.0 },
-    'Brownian': { type: 'triangle', type2: 'sine', detune: 2, lowPass: 800, attack: 0.05, release: 0.3 },
-    'Markov': { type: 'square', type2: 'sine', detune: 0, lowPass: 400, attack: 0.01, release: 0.1 },
-    'Stochastic': { type: 'square', type2: 'sawtooth', detune: 50, lowPass: 5000, attack: 0.005, release: 0.05 },
-    'Mirror': { type: 'sawtooth', type2: 'sawtooth', detune: 10, lowPass: 1500, attack: 0.01, release: 0.1 },
-    'Pedal': { type: 'sine', type2: 'sawtooth', detune: 3, lowPass: 600, attack: 1.5, release: 2.0 },
-    'Bitwise': { type: 'square', type2: null, detune: 0, lowPass: 10000, attack: 0.005, release: 0.1 },
-    'Intervallic': { type: 'triangle', type2: 'sine', detune: 4, lowPass: 2000, attack: 0.02, release: 0.4 },
-    'Euclidean': { type: 'square', type2: 'triangle', detune: 12, lowPass: 3000, attack: 0.005, release: 0.1 },
-    'Cellular': { type: 'sine', type2: 'triangle', detune: 7, lowPass: 1000, attack: 0.5, release: 1.5 },
-    'Fibonacci': { type: 'sawtooth', type2: 'square', detune: 5, lowPass: 2500, attack: 0.05, release: 0.5 },
-    'Anchor': { type: 'sine', type2: 'sine', detune: 0, lowPass: 300, attack: 0.1, release: 0.5 },
-    'Acid': { type: 'sawtooth', type2: null, detune: 0, lowPass: 800, attack: 0.01, release: 0.1, Q: 10 },
-    'Phasing': { type: 'sine', type2: null, detune: 0, lowPass: 4000, attack: 0.01, release: 0.1 },
-    'Motif': { type: 'sine', type2: 'square', detune: 24, lowPass: 3000, attack: 0.02, release: 0.2 },
-    'Pendulum': { type: 'triangle', type2: 'sine', detune: 0, lowPass: 1000, attack: 0.1, release: 0.5 },
-    'Drill': { type: 'sawtooth', type2: 'sine', detune: 2, lowPass: 500, attack: 0.05, release: 0.2 },
-    'Dubstep': { type: 'sawtooth', type2: 'square', detune: 15, lowPass: 1000, attack: 0.02, release: 0.2, wobble: true },
-    'Trance': { type: 'sawtooth', type2: 'sawtooth', detune: 25, lowPass: 3000, attack: 0.1, release: 0.4 },
-    'House': { type: 'square', type2: 'triangle', detune: 0, lowPass: 1500, attack: 0.01, release: 0.1 },
-    'Vapor': { type: 'triangle', type2: 'sine', detune: 10, lowPass: 1200, attack: 0.3, release: 0.8 },
-    'Synthwave': { type: 'sawtooth', type2: 'sine', detune: 5, lowPass: 2000, attack: 0.1, release: 0.5 },
-    'Garage': { type: 'sine', type2: 'square', detune: 40, lowPass: 800, attack: 0.02, release: 0.2 },
-    'Samba': { type: 'triangle', type2: null, detune: 0, lowPass: 4000, attack: 0.01, release: 0.05 },
-    'Industrial': { type: 'square', type2: 'sawtooth', detune: 100, lowPass: 1500, attack: 0.01, release: 0.1 },
-    'Trap': { type: 'sine', type2: null, detune: 0, lowPass: 300, attack: 0.05, release: 0.3 },
-    'Folk': { type: 'triangle', type2: 'sine', detune: 1, lowPass: 2500, attack: 0.05, release: 0.4 },
-    'Disco': { type: 'square', type2: 'square', detune: 5, lowPass: 2000, attack: 0.02, release: 0.2 },
-    'Grime': { type: 'square', type2: null, detune: 0, lowPass: 600, attack: 0.01, release: 0.1 },
-    'Neo-Soul': { type: 'sine', type2: 'triangle', detune: 2, lowPass: 1200, attack: 0.05, release: 0.5 },
-    'Classical': { type: 'triangle', type2: 'sine', detune: 0, lowPass: 3000, attack: 0.1, release: 0.5 },
-    'Neuro': { type: 'sawtooth', type2: 'square', detune: 12, lowPass: 800, attack: 0.01, release: 0.2, res: 5 },
-    'default': { type: 'triangle', type2: null, detune: 0, lowPass: 5000, attack: 0.02, release: 0.1 }
-};
 
 class AudioEngine {
     constructor() {
@@ -64,6 +29,7 @@ class AudioEngine {
         this.seqSwing = 0.0;
         this.kickEnabled = true;
         this.kickLevel = 0.15;
+        this.songPart = 'chorus';
         this.seqIsPlaying = false;
         this.seqNextNoteTime = 0.0;
         this.seqCurrentStep = 0;
@@ -78,6 +44,7 @@ class AudioEngine {
         this.musicalMode = "ionian";
         this.musicalOctave = 0;
         this.stepsPerBeat = 4;
+        this.stepsPerBar = 16;
         this.currentMeter = "4/4";
 
         // Global ADSR
@@ -86,7 +53,8 @@ class AudioEngine {
         this.allSlices = {};
         this.activeAlgo = 'transient';
         this.padMapping = Array.from({length: 16}, (_, i) => i);
-        this.toneLevel = 0.2;
+        this.toneLevel = 0.04;
+        this.activeTimbre = 'pure-sine';
         this.chordsEnabled = true;
         this.sampleLevel = 1.0;
         this._cachedMaskedPattern = null;
@@ -265,11 +233,11 @@ class AudioEngine {
 
     setMeter(meter) {
         this.currentMeter = meter;
-        if (meter === '3/4') this.stepsPerBeat = 4; // 3 beats of 4 16ths
-        else if (meter === '5/4') this.stepsPerBeat = 4;
-        else if (meter === '7/4') this.stepsPerBeat = 4;
-        else if (meter === '6/8') this.stepsPerBeat = 3; // 2 beats of 3 8ths
-        else this.stepsPerBeat = 4; // Default 4/4
+        if (meter === '3/4') { this.stepsPerBeat = 3; this.stepsPerBar = 12; }
+        else if (meter === '5/4') { this.stepsPerBeat = 5; this.stepsPerBar = 20; }
+        else if (meter === '7/4') { this.stepsPerBeat = 7; this.stepsPerBar = 28; }
+        else if (meter === '6/8') { this.stepsPerBeat = 3; this.stepsPerBar = 12; }
+        else { this.stepsPerBeat = 4; this.stepsPerBar = 16; } // Default 4/4
     }
 
     // --- Slicing Algorithms ---
@@ -449,12 +417,7 @@ class AudioEngine {
 
     // --- Playback & Sequencer ---
 
-    stopAllNodes() {
-        this.activeSources.forEach(src => {
-            try { src.stop(); } catch(e) {}
-        });
-        this.activeSources.clear();
-    }
+
 
     _createSource(sliceId, time, playbackRate = 1.0, ctx = this.ctx, destination = null, holdDurOverride = 0, gainMult = 1.0, isLong = false) {
         const dest = destination || (this.fxEnabled ? this.eqLow : this.globalGain);
@@ -487,41 +450,53 @@ class AudioEngine {
         let effectiveSustain = S;
         if (isLong && S < 0.7) effectiveSustain = 0.7;
 
-        let audibleDur = holdDur + R;
-        // If sustain is zero, the sound dies completely after Attack + Decay phase
-        if (effectiveSustain <= 0.001) {
-            audibleDur = Math.min(holdDur, A + D);
+        let audibleDur;
+        let releaseEndTime;
+        
+        gainNode.gain.setValueAtTime(0.0001, time);
+        
+        if (!isLong) {
+            // Single steps respect the ADSR envelope as set without holdDur cutoffs/choking
+            const peakTime = time + A;
+            gainNode.gain.exponentialRampToValueAtTime(0.7 * gainMult, peakTime);
+            
+            const decayEndTime = peakTime + D;
+            gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, effectiveSustain * gainMult), decayEndTime);
+            
+            releaseEndTime = decayEndTime + R;
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, releaseEndTime);
+            
+            audibleDur = A + D + R;
+        } else {
+            // Extended delay/hold for long notes across multiple steps
+            let peakTime = time + A;
+            if (peakTime > time + holdDur) peakTime = time + holdDur;
+            gainNode.gain.exponentialRampToValueAtTime(0.7 * gainMult, peakTime);
+            
+            let decayEndTime = peakTime + D;
+            if (decayEndTime > time + holdDur) decayEndTime = time + holdDur;
+            gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, effectiveSustain * gainMult), decayEndTime);
+            
+            gainNode.gain.setValueAtTime(Math.max(0.0001, effectiveSustain * gainMult), time + holdDur);
+            
+            releaseEndTime = time + holdDur + R;
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, releaseEndTime);
+            
+            audibleDur = holdDur + R;
+            if (effectiveSustain <= 0.001) {
+                audibleDur = Math.min(holdDur, A + D);
+            }
         }
         
-        // Total physical play duration (bound by actual buffer length, unless looping)
         const maxAvailableDur = (this.buffer.duration - slice.start) / playbackRate;
         let playDur = Math.min(audibleDur, maxAvailableDur);
 
-        // If long, enable looping to sustain short slices
         if (isLong) {
             source.loop = true;
             source.loopStart = slice.start;
             source.loopEnd = slice.end;
-            playDur = audibleDur; // Allow playing past the physical end since we loop
+            playDur = audibleDur;
         }
-
-        gainNode.gain.setValueAtTime(0.0001, time);
-        
-        let peakTime = time + A;
-        if (peakTime > time + holdDur) peakTime = time + holdDur;
-        gainNode.gain.exponentialRampToValueAtTime(0.7 * gainMult, peakTime);
-        
-        // Decay
-        let decayEndTime = peakTime + D;
-        if (decayEndTime > time + holdDur) decayEndTime = time + holdDur;
-        gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, effectiveSustain * gainMult), decayEndTime);
-        
-        // Sustain (hold S until holdDur)
-        gainNode.gain.setValueAtTime(Math.max(0.0001, effectiveSustain * gainMult), time + holdDur);
-        
-        // Release
-        const releaseEndTime = time + holdDur + R;
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, releaseEndTime);
 
         source.connect(gainNode);
         gainNode.connect(dest);
@@ -550,39 +525,18 @@ class AudioEngine {
 
 
     _createTone(midiNote, time, holdDur = 0.2, ctx = this.ctx, destination = null, gainMult = 1.0, isLong = false, strategy = 'default') {
-        const config = TIMBRE_CONFIGS[strategy] || TIMBRE_CONFIGS['default'];
         const dest = destination || (this.fxEnabled ? this.eqLow : this.globalGain);
         if (midiNote < 0) return null;
         
         const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
 
-        // Filter for timbre
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setTargetAtTime(config.lowPass, time, 0.01);
-        filter.Q.setTargetAtTime(config.Q || 1, time, 0.01);
-
-        const osc = ctx.createOscillator();
-        osc.type = config.type;
-        osc.frequency.setValueAtTime(freq, time);
-
-        let osc2 = null;
-        if (config.type2) {
-            osc2 = ctx.createOscillator();
-            osc2.type = config.type2;
-            osc2.frequency.setValueAtTime(freq, time);
-            osc2.detune.setValueAtTime(config.detune || 0, time);
-        }
-
         const gainNode = ctx.createGain();
         
-        // Use genre attack/release as base, then apply global ADSR deviations
-        let A = config.attack || this.adsr.attack;
+        let A = this.adsr.attack;
         let D = this.adsr.decay;
         const S = this.adsr.sustain;
-        let R = config.release || this.adsr.release;
+        let R = this.adsr.release;
 
-        // Boost sustain only for true long notes
         let effectiveSustain = S;
         if (isLong && S < 0.7) effectiveSustain = 0.7;
 
@@ -593,41 +547,312 @@ class AudioEngine {
             R *= Math.max(0.001, mult);
         }
 
-        let audibleDur = holdDur + R;
-        if (effectiveSustain <= 0.001) {
-            audibleDur = Math.min(holdDur, A + D);
+        gainNode.gain.setValueAtTime(0.0001, time);
+        
+        let releaseEndTime;
+        if (!isLong) {
+            const peakTime = time + A;
+            gainNode.gain.exponentialRampToValueAtTime(0.4 * gainMult, peakTime);
+            
+            const decayEndTime = peakTime + D;
+            gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, effectiveSustain * 0.4 * gainMult), decayEndTime);
+            
+            releaseEndTime = decayEndTime + R;
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, releaseEndTime);
+        } else {
+            let peakTime = time + A;
+            if (peakTime > time + holdDur) peakTime = time + holdDur;
+            gainNode.gain.exponentialRampToValueAtTime(0.4 * gainMult, peakTime);
+            
+            let decayEndTime = peakTime + D;
+            if (decayEndTime > time + holdDur) decayEndTime = time + holdDur;
+            gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, effectiveSustain * 0.4 * gainMult), decayEndTime);
+            
+            gainNode.gain.setValueAtTime(Math.max(0.0001, effectiveSustain * 0.4 * gainMult), time + holdDur);
+            
+            releaseEndTime = time + holdDur + R;
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, releaseEndTime);
         }
 
-        gainNode.gain.setValueAtTime(0.0001, time);
-        gainNode.gain.exponentialRampToValueAtTime(0.4 * gainMult, time + A);
-        gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, effectiveSustain * 0.4 * gainMult), time + A + D);
-        gainNode.gain.setValueAtTime(Math.max(0.0001, effectiveSustain * 0.4 * gainMult), time + holdDur);
-        
-        const releaseEndTime = time + holdDur + R;
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, releaseEndTime);
+        const timbre = this.activeTimbre || 'pure-sine';
+        const subNodes = [];
+        let outputNode = null;
 
-        osc.connect(filter);
-        if (osc2) osc2.connect(filter);
-        filter.connect(gainNode);
+        if (timbre === 'pure-sine') {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, time);
+            outputNode = osc;
+            subNodes.push(osc);
+        } else if (timbre === 'fm-pluck') {
+            const carrier = ctx.createOscillator();
+            carrier.type = 'sine';
+            carrier.frequency.setValueAtTime(freq, time);
+            
+            const modulator = ctx.createOscillator();
+            modulator.type = 'sine';
+            modulator.frequency.setValueAtTime(freq * 2, time);
+            
+            const modGain = ctx.createGain();
+            modGain.gain.setValueAtTime(freq * 3, time);
+            modGain.gain.exponentialRampToValueAtTime(10, time + 0.08);
+            
+            modulator.connect(modGain);
+            modGain.connect(carrier.frequency);
+            
+            outputNode = carrier;
+            subNodes.push(carrier, modulator);
+        } else if (timbre === 'sub-bass') {
+            const merger = ctx.createGain();
+            merger.gain.setValueAtTime(1.0, time);
+            
+            const osc1 = ctx.createOscillator();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(freq, time);
+            
+            const osc2 = ctx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq * 0.5, time);
+            
+            const gain2 = ctx.createGain();
+            gain2.gain.setValueAtTime(0.5, time);
+            
+            osc1.connect(merger);
+            osc2.connect(gain2);
+            gain2.connect(merger);
+            
+            outputNode = merger;
+            subNodes.push(osc1, osc2);
+        } else if (timbre === 'analog-saw') {
+            const osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, time);
+            
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(Math.min(20000, freq * 4 + 400), time);
+            filter.Q.setValueAtTime(1.2, time);
+            
+            osc.connect(filter);
+            outputNode = filter;
+            subNodes.push(osc);
+        } else if (timbre === 'square-lead') {
+            const osc = ctx.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, time);
+            
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(Math.min(20000, freq * 6 + 600), time);
+            
+            osc.connect(filter);
+            outputNode = filter;
+            subNodes.push(osc);
+        } else if (timbre === 'triangle-flute') {
+            const osc = ctx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, time);
+            outputNode = osc;
+            subNodes.push(osc);
+        } else if (timbre === 'detuned-supersaw') {
+            const merger = ctx.createGain();
+            merger.gain.setValueAtTime(0.7, time);
+            
+            const osc1 = ctx.createOscillator();
+            osc1.type = 'sawtooth';
+            osc1.frequency.setValueAtTime(freq, time);
+            osc1.detune.setValueAtTime(-8, time);
+            
+            const osc2 = ctx.createOscillator();
+            osc2.type = 'sawtooth';
+            osc2.frequency.setValueAtTime(freq, time);
+            osc2.detune.setValueAtTime(8, time);
+            
+            osc1.connect(merger);
+            osc2.connect(merger);
+            
+            outputNode = merger;
+            subNodes.push(osc1, osc2);
+        } else if (timbre === 'electric-piano') {
+            const merger = ctx.createGain();
+            merger.gain.setValueAtTime(1.0, time);
+            
+            const fundamental = ctx.createOscillator();
+            fundamental.type = 'sine';
+            fundamental.frequency.setValueAtTime(freq, time);
+            
+            const tine = ctx.createOscillator();
+            tine.type = 'sine';
+            tine.frequency.setValueAtTime(freq * 4.5, time);
+            
+            const tineGain = ctx.createGain();
+            tineGain.gain.setValueAtTime(0.4, time);
+            tineGain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+            
+            fundamental.connect(merger);
+            tine.connect(tineGain);
+            tineGain.connect(merger);
+            
+            outputNode = merger;
+            subNodes.push(fundamental, tine);
+        } else if (timbre === 'glockenspiel') {
+            const merger = ctx.createGain();
+            merger.gain.setValueAtTime(0.8, time);
+            
+            const fund = ctx.createOscillator(); fund.type = 'sine'; fund.frequency.setValueAtTime(freq, time);
+            const part1 = ctx.createOscillator(); part1.type = 'sine'; part1.frequency.setValueAtTime(freq * 2.75, time);
+            const part2 = ctx.createOscillator(); part2.type = 'sine'; part2.frequency.setValueAtTime(freq * 5.4, time);
+            
+            const g1 = ctx.createGain(); g1.gain.setValueAtTime(0.3, time);
+            const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.15, time);
+            
+            fund.connect(merger);
+            part1.connect(g1); g1.connect(merger);
+            part2.connect(g2); g2.connect(merger);
+            
+            outputNode = merger;
+            subNodes.push(fund, part1, part2);
+        } else if (timbre === 'organ-drawbar') {
+            const merger = ctx.createGain();
+            merger.gain.setValueAtTime(0.6, time);
+            
+            const fund = ctx.createOscillator(); fund.type = 'sine'; fund.frequency.setValueAtTime(freq, time);
+            const oct = ctx.createOscillator(); oct.type = 'sine'; oct.frequency.setValueAtTime(freq * 2, time);
+            const fifth = ctx.createOscillator(); fifth.type = 'sine'; fifth.frequency.setValueAtTime(freq * 2.996, time);
+            
+            const gOct = ctx.createGain(); gOct.gain.setValueAtTime(0.5, time);
+            const gFifth = ctx.createGain(); gFifth.gain.setValueAtTime(0.35, time);
+            
+            fund.connect(merger);
+            oct.connect(gOct); gOct.connect(merger);
+            fifth.connect(gFifth); gFifth.connect(merger);
+            
+            outputNode = merger;
+            subNodes.push(fund, oct, fifth);
+        } else if (timbre === 'muted-brass') {
+            const osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, time);
+            
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(Math.min(20000, freq * 5 + 500), time);
+            filter.frequency.exponentialRampToValueAtTime(Math.min(20000, freq * 1.5 + 200), time + 0.15);
+            filter.Q.setValueAtTime(2.0, time);
+            
+            osc.connect(filter);
+            outputNode = filter;
+            subNodes.push(osc);
+        } else if (timbre === 'chiptune-pulse') {
+            const osc = ctx.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, time);
+            
+            const hp = ctx.createBiquadFilter();
+            hp.type = 'highpass';
+            hp.frequency.setValueAtTime(Math.min(20000, freq * 0.8), time);
+            
+            osc.connect(hp);
+            outputNode = hp;
+            subNodes.push(osc);
+        } else if (timbre === 'ghostly-pad') {
+            const osc = ctx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, time);
+            
+            const lfo = ctx.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.setValueAtTime(3.0, time);
+            
+            const lfoGain = ctx.createGain();
+            lfoGain.gain.setValueAtTime(6.0, time);
+            
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(Math.min(20000, freq * 2.5 + 300), time);
+            
+            osc.connect(filter);
+            outputNode = filter;
+            subNodes.push(osc, lfo);
+        } else if (timbre === 'plucked-string') {
+            const merger = ctx.createGain();
+            merger.gain.setValueAtTime(1.0, time);
+            
+            const fund = ctx.createOscillator();
+            fund.type = 'sine';
+            fund.frequency.setValueAtTime(freq, time);
+            
+            const snap = ctx.createOscillator();
+            snap.type = 'sawtooth';
+            snap.frequency.setValueAtTime(freq * 2, time);
+            
+            const snapGain = ctx.createGain();
+            snapGain.gain.setValueAtTime(0.5, time);
+            snapGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+            
+            fund.connect(merger);
+            snap.connect(snapGain); snapGain.connect(merger);
+            
+            outputNode = merger;
+            subNodes.push(fund, snap);
+        } else if (timbre === 'hollow-bell') {
+            const merger = ctx.createGain();
+            merger.gain.setValueAtTime(0.8, time);
+            
+            const fund = ctx.createOscillator(); fund.type = 'sine'; fund.frequency.setValueAtTime(freq, time);
+            const h5 = ctx.createOscillator(); h5.type = 'sine'; h5.frequency.setValueAtTime(freq * 2.996, time);
+            const h7 = ctx.createOscillator(); h7.type = 'sine'; h7.frequency.setValueAtTime(freq * 4.1, time);
+            
+            const g5 = ctx.createGain(); g5.gain.setValueAtTime(0.4, time);
+            const g7 = ctx.createGain(); g7.gain.setValueAtTime(0.2, time);
+            
+            fund.connect(merger);
+            h5.connect(g5); g5.connect(merger);
+            h7.connect(g7); g7.connect(merger);
+            
+            outputNode = merger;
+            subNodes.push(fund, h5, h7);
+        } else if (timbre === 'acid-synth') {
+            const osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, time);
+            
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(Math.min(20000, freq * 8 + 1000), time);
+            filter.frequency.exponentialRampToValueAtTime(Math.min(20000, freq * 2 + 300), time + 0.12);
+            filter.Q.setValueAtTime(6.0, time);
+            
+            osc.connect(filter);
+            outputNode = filter;
+            subNodes.push(osc);
+        } else {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, time);
+            outputNode = osc;
+            subNodes.push(osc);
+        }
+
+        outputNode.connect(gainNode);
         gainNode.connect(dest);
 
-        const item1 = { source: osc, gain: gainNode };
-        const item2 = osc2 ? { source: osc2, gain: gainNode } : null;
-        if (ctx === this.ctx) {
-            this.activeSources.add(item1);
-            if (item2) this.activeSources.add(item2);
-            osc.onended = () => {
-                this.activeSources.delete(item1);
-                if (item2) this.activeSources.delete(item2);
-            };
-        }
+        subNodes.forEach(osc => {
+            const item = { source: osc, gain: gainNode };
+            if (ctx === this.ctx) {
+                this.activeSources.add(item);
+                osc.onended = () => {
+                    this.activeSources.delete(item);
+                };
+            }
+            osc.start(time);
+            osc.stop(releaseEndTime);
+        });
 
-        osc.start(time);
-        if (osc2) osc2.start(time);
-        osc.stop(releaseEndTime);
-        if (osc2) osc2.stop(releaseEndTime);
-        
-        return osc;
+        return outputNode;
     }
 
     playPad(sliceId, midiNoteOverride = -1) {

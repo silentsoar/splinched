@@ -13,7 +13,15 @@ const GENRE_BPMS = {
     'Drill': 140, 'Dubstep': 140, 'Trance': 138, 'House': 124,
     'Vapor': 90, 'Synthwave': 110, 'Garage': 130, 'Samba': 105,
     'Industrial': 150, 'Trap': 140, 'Folk': 110, 'Disco': 120,
-    'Grime': 140, 'Neo-Soul': 90, 'Classical': 100, 'Neuro': 172
+    'Grime': 140, 'Neo-Soul': 90, 'Classical': 100, 'Neuro': 172,
+    'Bossa Nova': 120, 'Cumbia': 96, 'Dancehall': 100, 'Flamenco': 130,
+    'Polyrhythmic': 120, 'Rumba': 112, 'Bhangra': 105, 'Footwork': 160,
+    'Drum & Bass': 174, 'Jungle': 165, 'Breakbeat': 130, 'Future Bass': 150,
+    'Hardstyle': 150, 'IDM': 125, 'Psytrance': 142, 'Slap House': 124,
+    'Cinematic': 90, 'Dungeon Synth': 80, 'Electroacoustic': 100, 'Generative Drone': 60,
+    'Krautrock': 126, 'Post-Rock': 130, 'Shoegaze': 110, 'Spectral': 85,
+    'Hyperpop': 150, 'Jersey Club': 135, 'Phonk': 120, 'R&B': 75,
+    'Synth-Pop': 118, 'UK Drill': 142, 'UK Funky': 130, 'Witch House': 115
 };
 
 // DOM Elements
@@ -72,6 +80,29 @@ const valProbability = document.getElementById('val-probability');
 const adsrDeviationSlider = document.getElementById('adsr-deviation');
 const valAdsrDeviation = document.getElementById('val-adsr-deviation');
 
+const ALGO_TIMBRES = {
+    'Brownian': 'electric-piano', 'Intervallic': 'glockenspiel', 'Euclidean': 'pure-sine',
+    'Harmonic': 'hollow-bell', 'Markov': 'sub-bass', 'Stochastic': 'chiptune-pulse',
+    'Mirror': 'square-lead', 'Pedal': 'organ-drawbar', 'Bitwise': 'chiptune-pulse',
+    'Cellular': 'ghostly-pad', 'Fibonacci': 'glockenspiel', 'Anchor': 'organ-drawbar',
+    'Acid': 'acid-synth', 'Phasing': 'pure-sine', 'Motif': 'pure-sine', 'Pendulum': 'muted-brass',
+    'Drill': 'sub-bass', 'Dubstep': 'detuned-supersaw', 'Trance': 'detuned-supersaw', 'House': 'square-lead',
+    'Vapor': 'ghostly-pad', 'Synthwave': 'analog-saw', 'Garage': 'square-lead', 'Samba': 'triangle-flute',
+    'Industrial': 'acid-synth', 'Trap': 'fm-pluck', 'Folk': 'plucked-string', 'Disco': 'electric-piano',
+    'Grime': 'square-lead', 'Neo-Soul': 'electric-piano', 'Classical': 'plucked-string', 'Neuro': 'detuned-supersaw',
+    'Bossa Nova': 'electric-piano', 'Cumbia': 'triangle-flute', 'Dancehall': 'sub-bass', 'Flamenco': 'plucked-string',
+    'Polyrhythmic': 'triangle-flute', 'Rumba': 'pure-sine', 'Bhangra': 'triangle-flute', 'Footwork': 'chiptune-pulse',
+    'Drum & Bass': 'sub-bass', 'Jungle': 'sub-bass', 'Breakbeat': 'analog-saw', 'Future Bass': 'detuned-supersaw',
+    'Hardstyle': 'detuned-supersaw', 'IDM': 'chiptune-pulse', 'Psytrance': 'analog-saw', 'Slap House': 'fm-pluck',
+    'Cinematic': 'ghostly-pad', 'Dungeon Synth': 'ghostly-pad', 'Electroacoustic': 'glockenspiel', 'Generative Drone': 'ghostly-pad',
+    'Krautrock': 'analog-saw', 'Post-Rock': 'plucked-string', 'Shoegaze': 'detuned-supersaw', 'Spectral': 'hollow-bell',
+    'Hyperpop': 'chiptune-pulse', 'Jersey Club': 'fm-pluck', 'Phonk': 'muted-brass', 'R&B': 'electric-piano',
+    'Synth-Pop': 'analog-saw', 'UK Drill': 'sub-bass', 'UK Funky': 'square-lead', 'Witch House': 'ghostly-pad'
+};
+
+const timbreSelect = document.getElementById('seq-timbre');
+const btnAutoTimbre = document.getElementById('btn-auto-timbre');
+let autoTimbreEnabled = true;
 
 const algoButtons = {
     'Brownian': document.getElementById('btn-algo-brownian'),
@@ -105,7 +136,39 @@ const algoButtons = {
     'Grime': document.getElementById('btn-algo-grime'),
     'Neo-Soul': document.getElementById('btn-algo-neosoul'),
     'Classical': document.getElementById('btn-algo-classical'),
-    'Neuro': document.getElementById('btn-algo-neuro')
+    'Neuro': document.getElementById('btn-algo-neuro'),
+    'Bossa Nova': document.getElementById('btn-algo-bossanova'),
+    'Cumbia': document.getElementById('btn-algo-cumbia'),
+    'Dancehall': document.getElementById('btn-algo-dancehall'),
+    'Flamenco': document.getElementById('btn-algo-flamenco'),
+    'Polyrhythmic': document.getElementById('btn-algo-polyrhythmic'),
+    'Rumba': document.getElementById('btn-algo-rumba'),
+    'Bhangra': document.getElementById('btn-algo-bhangra'),
+    'Footwork': document.getElementById('btn-algo-footwork'),
+    'Drum & Bass': document.getElementById('btn-algo-dnb'),
+    'Jungle': document.getElementById('btn-algo-jungle'),
+    'Breakbeat': document.getElementById('btn-algo-breakbeat'),
+    'Future Bass': document.getElementById('btn-algo-futurebass'),
+    'Hardstyle': document.getElementById('btn-algo-hardstyle'),
+    'IDM': document.getElementById('btn-algo-idm'),
+    'Psytrance': document.getElementById('btn-algo-psytrance'),
+    'Slap House': document.getElementById('btn-algo-slaphouse'),
+    'Cinematic': document.getElementById('btn-algo-cinematic'),
+    'Dungeon Synth': document.getElementById('btn-algo-dungeonsynth'),
+    'Electroacoustic': document.getElementById('btn-algo-electroacoustic'),
+    'Generative Drone': document.getElementById('btn-algo-generativedrone'),
+    'Krautrock': document.getElementById('btn-algo-krautrock'),
+    'Post-Rock': document.getElementById('btn-algo-postrock'),
+    'Shoegaze': document.getElementById('btn-algo-shoegaze'),
+    'Spectral': document.getElementById('btn-algo-spectral'),
+    'Hyperpop': document.getElementById('btn-algo-hyperpop'),
+    'Jersey Club': document.getElementById('btn-algo-jerseyclub'),
+    'Phonk': document.getElementById('btn-algo-phonk'),
+    'R&B': document.getElementById('btn-algo-rnb'),
+    'Synth-Pop': document.getElementById('btn-algo-synthpop'),
+    'UK Drill': document.getElementById('btn-algo-ukdrill'),
+    'UK Funky': document.getElementById('btn-algo-ukfunky'),
+    'Witch House': document.getElementById('btn-algo-witchhouse')
 };
 
 
@@ -147,6 +210,9 @@ const valSampleLevel = document.getElementById('val-sample-level');
 const toneLevelSlider = document.getElementById('seq-tone-level');
 const valToneLevel = document.getElementById('val-tone-level');
 const chordsCheck = document.getElementById('seq-tone-chords');
+const partToggle = document.getElementById('seq-part-toggle');
+const labelChorus = document.getElementById('label-chorus');
+const labelVerse = document.getElementById('label-verse');
 const autoBpmBtn = document.getElementById('btn-auto-bpm');
 const algoLenSelect = document.getElementById('algo-len');
 const seqMeterSelect = document.getElementById('seq-meter');
@@ -220,7 +286,7 @@ const SLIDER_DEFAULTS = {
     'seq-swing': 0,
     'kick-level': fromLogPercent(0.15),
     'seq-sample-level': fromLogPercent(1.0),
-    'seq-tone-level': fromLogPercent(0.2),
+    'seq-tone-level': fromLogPercent(0.04),
     'adsr-deviation': 50
 };
 
@@ -574,6 +640,25 @@ function setupEventListeners() {
         saveSettings();
     });
 
+    timbreSelect.addEventListener('change', () => {
+        engine.activeTimbre = timbreSelect.value;
+        autoTimbreEnabled = false;
+        btnAutoTimbre.classList.remove('btn-auto-bpm-active');
+        saveSettings();
+    });
+
+    btnAutoTimbre.addEventListener('click', () => {
+        autoTimbreEnabled = !autoTimbreEnabled;
+        btnAutoTimbre.classList.toggle('btn-auto-bpm-active', autoTimbreEnabled);
+        if (autoTimbreEnabled) {
+            const currentStrategy = Object.keys(algoButtons).find(k => algoButtons[k].classList.contains('btn-primary')) || 'Harmonic';
+            const matchedTimbre = ALGO_TIMBRES[currentStrategy] || 'pure-sine';
+            engine.activeTimbre = matchedTimbre;
+            timbreSelect.value = matchedTimbre;
+        }
+        saveSettings();
+    });
+
     // ADSR
     function updateAdsr(e) {
         if (e && e.target) updateSliderUI(e.target);
@@ -730,6 +815,33 @@ function setupEventListeners() {
         saveSettings();
     });
 
+    if (partToggle) {
+        const updatePartToggleUI = () => {
+            const isVerse = partToggle.checked;
+            engine.songPart = isVerse ? 'verse' : 'chorus';
+            if (labelChorus && labelVerse) {
+                labelChorus.className = isVerse ? 'toggle-label' : 'toggle-label active-primary';
+                labelVerse.className = isVerse ? 'toggle-label active-secondary' : 'toggle-label';
+                labelChorus.style.color = isVerse ? 'var(--text-muted)' : '';
+                labelVerse.style.color = isVerse ? '' : 'var(--text-muted)';
+            }
+            saveSettings();
+        };
+        partToggle.addEventListener('change', updatePartToggleUI);
+        if (labelChorus) {
+            labelChorus.addEventListener('click', () => {
+                partToggle.checked = false;
+                updatePartToggleUI();
+            });
+        }
+        if (labelVerse) {
+            labelVerse.addEventListener('click', () => {
+                partToggle.checked = true;
+                updatePartToggleUI();
+            });
+        }
+    }
+
 
 
     Object.keys(algoButtons).forEach(strategy => {
@@ -877,14 +989,33 @@ function generateAlgorithmicPattern(strategy) {
         engine.seqBpm = newBpm;
     }
 
+    if (autoTimbreEnabled && ALGO_TIMBRES[strategy]) {
+        const matchedTimbre = ALGO_TIMBRES[strategy];
+        engine.activeTimbre = matchedTimbre;
+        if (timbreSelect) timbreSelect.value = matchedTimbre;
+    }
+
     const len = parseInt(algoLenSelect.value) || 64;
     const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode, 2, 4);
     
     let steps = [];
-    const density = engine.seqDensity || 0.5;
+    const isVerse = engine.songPart === 'verse';
+    // Verse section patterns have slightly sparser density to accommodate vocal/lead lines
+    const density = (engine.seqDensity || 0.5) * (isVerse ? 0.75 : 1.0);
+
+    // Map any raw strategy index safely to a section-optimized register range.
+    // Verse melodies sit more comfortably in the lower/mid register.
+    // Chorus melodies sit higher, acting as a confident soaring lead.
+    const getOptimizedIdx = (rawIdx) => {
+        // Normalize out-of-bounds legacy roots
+        let baseIdx = rawIdx < 0 ? 0 : rawIdx;
+        let shift = isVerse ? -3 : 5;
+        return Math.max(0, Math.min(validNotes.length - 1, baseIdx + shift));
+    };
 
     const findBestSlice = (targetIdx) => {
-        const targetMidi = validNotes[targetIdx];
+        const optimizedIdx = getOptimizedIdx(targetIdx);
+        const targetMidi = validNotes[optimizedIdx];
         let bestSliceId = 0;
         let minDiff = Infinity;
         engine.slices.forEach((slice, idx) => {
@@ -897,11 +1028,12 @@ function generateAlgorithmicPattern(strategy) {
     };
 
     const getOffset = (currentIdx, sliceId) => {
+        const optimizedIdx = getOptimizedIdx(currentIdx);
         const slice = engine.slices[sliceId];
         if (slice && slice.pitch && slice.pitch.midi > 0) {
             const sliceBaseMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, engine.musicalKey, engine.musicalMode);
             const sliceBaseIdx = validNotes.indexOf(sliceBaseMidi);
-            if (sliceBaseIdx !== -1) return currentIdx - sliceBaseIdx;
+            if (sliceBaseIdx !== -1) return optimizedIdx - sliceBaseIdx;
         }
         return 0;
     };
@@ -1314,12 +1446,341 @@ function generateAlgorithmicPattern(strategy) {
                 steps.push({ step: i, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
             } else steps.push({ step: i, active: false });
         }
+    } else if (strategy === 'Bossa Nova') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        const clave = [1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0];
+        for (let j = 0; j < len; j++) {
+            if (clave[j % 16] && Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + [0, 2, 4, 7][Math.floor(Math.random() * 4)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, isChord: Math.random() < 0.4, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Cumbia') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 10;
+        for (let j = 0; j < len; j++) {
+            const isOffbeat = j % 4 === 2 || j % 4 === 3;
+            if (isOffbeat && Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + (j % 8 < 4 ? 0 : 7);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Dancehall') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 12;
+        const tresillo = [1, 0, 0, 1, 0, 0, 1, 0];
+        for (let j = 0; j < len; j++) {
+            if (tresillo[j % 8] && Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + [0, 0, 12][Math.floor(Math.random() * 3)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Flamenco') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density) {
+                const currentIdx = rootIdx + [0, 1, 4, 5, 7][Math.floor(Math.random() * 5)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, ratchets: Math.random() < 0.25 ? 3 : 1, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Polyrhythmic') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        for (let j = 0; j < len; j++) {
+            const isPulse = j % 5 === 0 || j % 7 === 0;
+            if (isPulse || Math.random() < density * 0.5) {
+                const currentIdx = rootIdx + (j % 5) + (j % 7);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Rumba') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        for (let j = 0; j < len; j++) {
+            const isCall = j % 8 < 4;
+            if (Math.random() < density) {
+                const currentIdx = rootIdx + (isCall ? 0 : [2, 4, 7][Math.floor(Math.random() * 3)]);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Bhangra') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        for (let j = 0; j < len; j++) {
+            const isBounce = j % 4 === 0 || j % 4 === 3;
+            if (isBounce && Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + (j % 8 === 0 ? 0 : 12);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Footwork') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density * 1.2) {
+                const currentIdx = rootIdx + Math.floor(Math.random() * 12);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, ratchets: Math.random() < 0.3 ? 4 : 1, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Drum & Bass') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + (j % 4 === 0 ? 0 : Math.floor(Math.random() * 16));
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Jungle') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        while (i < len) {
+            if (Math.random() < density * 1.2) {
+                const isBass = i % 8 < 4;
+                const duration = isBass ? 1 : [2, 4][Math.floor(Math.random() * 2)];
+                const currentIdx = rootIdx + (isBass ? 0 : 12 + Math.floor(Math.random() * 7));
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: i, active: true, duration, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
+        }
+    } else if (strategy === 'Breakbeat') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        for (let j = 0; j < len; j++) {
+            const isBreak = j % 8 === 3 || j % 8 === 6;
+            if (!isBreak && Math.random() < density * 1.3) {
+                const currentIdx = rootIdx + [0, 3, 5, 7][Math.floor(Math.random() * 4)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, swing: 0.15, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Future Bass') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        while (i < len) {
+            if (i % 4 === 0 && Math.random() < density * 2) {
+                const duration = 4;
+                const currentIdx = rootIdx + [0, 4, 5, 7][Math.floor(Math.random() * 4)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: i, active: true, duration, isChord: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
+        }
+    } else if (strategy === 'Hardstyle') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        for (let j = 0; j < len; j++) {
+            const isOff = j % 4 === 2;
+            if (isOff || Math.random() < density * 0.5) {
+                const currentIdx = rootIdx + (isOff ? 0 : 12);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'IDM') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        while (i < len) {
+            if (Math.random() < density) {
+                const duration = Math.random() < 0.3 ? [1, 2, 3, 5][Math.floor(Math.random() * 4)] : 1;
+                const currentIdx = rootIdx + (Math.floor(Math.pow(Math.random(), 2) * 16));
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: i, active: true, duration, ratchets: Math.random() < 0.1 ? 2 : 1, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
+        }
+    } else if (strategy === 'Psytrance') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        for (let j = 0; j < len; j++) {
+            if (j % 4 !== 0 && Math.random() < density * 1.8) {
+                const currentIdx = rootIdx + (j % 16 === 14 ? 12 : 0);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Slap House') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density * 1.3) {
+                const currentIdx = rootIdx + [0, 0, 12, 12][Math.floor(Math.random() * 4)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Cinematic') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const cell = [0, 7, 8, 7];
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + cell[j % 4];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Dungeon Synth') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        while (i < len) {
+            if (Math.random() < density * 1.5) {
+                const duration = 4;
+                const currentIdx = rootIdx + (i % 8 === 0 ? 0 : 7);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: i, active: true, duration, isChord: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
+        }
+    } else if (strategy === 'Electroacoustic') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density * 0.4) {
+                const currentIdx = rootIdx + (Math.random() < 0.5 ? -12 : 12);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Generative Drone') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        while (i < len) {
+            if (Math.random() < density * 2) {
+                const duration = 8;
+                const currentIdx = rootIdx + [0, 1, 2][Math.floor(Math.random() * 3)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: i, active: true, duration, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
+        }
+    } else if (strategy === 'Krautrock') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density * 1.8) {
+                const currentIdx = rootIdx + (j % 2 === 0 ? 0 : 12);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Post-Rock') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + [0, 4, 7, 11][Math.floor(Math.random() * 4)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Shoegaze') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        for (let j = 0; j < len; j++) {
+            if (j % 4 === 0 && Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + [0, 5, 7][Math.floor(Math.random() * 3)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, isChord: true, duration: 4, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Spectral') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const overtones = [0, 12, 19, 24, 28, 31, 34, 36];
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density) {
+                const currentIdx = rootIdx + overtones[j % overtones.length];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Hyperpop') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density * 1.4) {
+                const currentIdx = rootIdx + (Math.random() < 0.5 ? 0 : Math.floor(Math.random() * 24));
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, ratchets: Math.random() < 0.2 ? 4 : 1, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Jersey Club') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const jersey = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0];
+        for (let j = 0; j < len; j++) {
+            if (jersey[j % 16] && Math.random() < density * 1.8) {
+                const currentIdx = rootIdx + (j % 8 === 0 ? 0 : 12);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Phonk') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density * 1.3) {
+                const isCowbell = j % 4 !== 0;
+                const currentIdx = rootIdx + (isCowbell ? 24 + (j % 3) : 0);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'R&B') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 7;
+        while (i < len) {
+            if (Math.random() < density) {
+                const duration = [2, 4][Math.floor(Math.random() * 2)];
+                const currentIdx = rootIdx + [0, 2, 4, 9][Math.floor(Math.random() * 4)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: i, active: true, duration, isChord: true, microTiming: 0.03, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+                for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
+                i += duration;
+            } else { steps.push({ step: i, active: false }); i++; }
+        }
+    } else if (strategy === 'Synth-Pop') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        for (let j = 0; j < len; j++) {
+            if (Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + (j % 2 === 0 ? 0 : 12);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'UK Drill') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        for (let j = 0; j < len; j++) {
+            const isSlide = j % 8 === 6 || j % 8 === 7;
+            if (Math.random() < density * 1.2) {
+                const currentIdx = rootIdx + (isSlide ? 12 : 0);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'UK Funky') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 12;
+        const funky = [1, 0, 0, 1, 0, 0, 1, 0];
+        for (let j = 0; j < len; j++) {
+            if (funky[j % 8] && Math.random() < density * 1.5) {
+                const currentIdx = rootIdx + (j % 8 === 0 ? 0 : 7);
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
+    } else if (strategy === 'Witch House') {
+        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        for (let j = 0; j < len; j++) {
+            if (j % 2 === 0 && Math.random() < density * 1.4) {
+                const currentIdx = rootIdx + [0, 1, 7][Math.floor(Math.random() * 3)];
+                const sliceId = findBestSlice(currentIdx);
+                steps.push({ step: j, active: true, isChord: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
+            } else steps.push({ step: j, active: false });
+        }
     }
 
     if (steps.length > len) {
         steps = steps.slice(0, len);
     } else while (steps.length < len) {
         steps.push({ step: steps.length, active: false });
+    }
+
+    if (isVerse) {
+        steps.forEach(step => {
+            if (step.active && step.isChord && Math.random() < 0.75) {
+                step.isChord = false; // Thin out most chords to make Verse sound sparser
+            }
+        });
     }
 
     const newPat = {
@@ -2051,6 +2512,7 @@ function saveSettings() {
         sampleLevel: sampleLevelSlider.value,
         toneLevel: toneLevelSlider.value,
         chords: chordsCheck.checked,
+        part: partToggle ? (partToggle.checked ? 'verse' : 'chorus') : 'chorus',
         reverb: fxReverb.value,
         delay: fxDelay.value,
         distort: fxDistort.value,
@@ -2058,7 +2520,9 @@ function saveSettings() {
         eqLow: fxEqLow.value,
         eqMid: fxEqMid.value,
         eqHigh: fxEqHigh.value,
-        autoBpm: autoBpmEnabled
+        autoBpm: autoBpmEnabled,
+        timbre: timbreSelect ? timbreSelect.value : 'pure-sine',
+        autoTimbre: autoTimbreEnabled
     };
     localStorage.setItem('splinchedSettings', JSON.stringify(settings));
 }
@@ -2112,7 +2576,7 @@ function loadSettings() {
             else sampleLevelSlider.value = fromLogPercent(1.0);
 
             if (settings.toneLevel !== undefined) toneLevelSlider.value = settings.toneLevel;
-            else toneLevelSlider.value = fromLogPercent(0.2);
+            else toneLevelSlider.value = fromLogPercent(0.04);
 
             if (settings.chords !== undefined) chordsCheck.checked = settings.chords;
             else chordsCheck.checked = true;
@@ -2121,6 +2585,16 @@ function loadSettings() {
             engine.sampleLevel = toLogPercent(parseInt(sampleLevelSlider.value));
             engine.toneLevel = toLogPercent(parseInt(toneLevelSlider.value));
             engine.chordsEnabled = chordsCheck.checked;
+            if (partToggle) {
+                partToggle.checked = (settings.part === 'verse');
+                engine.songPart = settings.part || 'chorus';
+                if (labelChorus && labelVerse) {
+                    labelChorus.className = partToggle.checked ? 'toggle-label' : 'toggle-label active-primary';
+                    labelVerse.className = partToggle.checked ? 'toggle-label active-secondary' : 'toggle-label';
+                    labelChorus.style.color = partToggle.checked ? 'var(--text-muted)' : '';
+                    labelVerse.style.color = partToggle.checked ? '' : 'var(--text-muted)';
+                }
+            }
 
             // Load FX values
             if (settings.reverb !== undefined) fxReverb.value = settings.reverb;
@@ -2137,6 +2611,22 @@ function loadSettings() {
             } else {
                 autoBpmEnabled = true;
                 autoBpmBtn.classList.add('btn-auto-bpm-active');
+            }
+
+            if (settings.timbre !== undefined && timbreSelect) {
+                timbreSelect.value = settings.timbre;
+                engine.activeTimbre = settings.timbre;
+            } else {
+                if (timbreSelect) timbreSelect.value = 'pure-sine';
+                engine.activeTimbre = 'pure-sine';
+            }
+
+            if (settings.autoTimbre !== undefined && btnAutoTimbre) {
+                autoTimbreEnabled = settings.autoTimbre;
+                btnAutoTimbre.classList.toggle('btn-auto-bpm-active', autoTimbreEnabled);
+            } else if (btnAutoTimbre) {
+                autoTimbreEnabled = true;
+                btnAutoTimbre.classList.add('btn-auto-bpm-active');
             }
             
             // Dispatch events to update UI text visually
