@@ -26,6 +26,7 @@ const GENRE_BPMS = {
 
 // DOM Elements
 const workspace = document.getElementById('workspace');
+const waveformArea = document.getElementById('waveform-area');
 const uploadOverlay = document.getElementById('upload-overlay');
 const audioUploadInput = document.getElementById('audio-upload');
 const canvas = document.getElementById('waveform-canvas');
@@ -213,6 +214,7 @@ const valToneLevel = document.getElementById('val-tone-level');
 const chordsCheck = document.getElementById('seq-tone-chords');
 const moreLongNotesCheck = document.getElementById('seq-more-long-notes');
 const contrastCheck = document.getElementById('seq-contrast');
+const tuneCheck = document.getElementById('seq-tune');
 const partToggle = document.getElementById('seq-part-toggle');
 const labelChorus = document.getElementById('label-chorus');
 const labelVerse = document.getElementById('label-verse');
@@ -500,6 +502,8 @@ async function init() {
             await engine.loadAudio(savedAudio.slice(0));
             uploadOverlay.classList.add('hidden');
             workspace.classList.remove('hidden');
+            waveformArea.classList.remove('hidden');
+            handleResize();
             processAudio();
         } catch(e) {
             console.error("Error loading saved audio", e);
@@ -623,6 +627,14 @@ function setupEventListeners() {
         uploadOverlay.classList.remove('drag-over');
         if (e.dataTransfer.files.length > 0) handleFileUpload(e.dataTransfer.files[0]);
     });
+
+    if (tuneCheck) {
+        tuneCheck.addEventListener('change', (e) => {
+            engine.tuneEnabled = e.target.checked;
+            renderSequencerGrid();
+            saveSettings();
+        });
+    }
 
     // Recording
     btnRecord.addEventListener('click', startRecording);
@@ -1171,7 +1183,17 @@ function generateAlgorithmicPattern(strategy) {
     }
 
     const len = parseInt(algoLenSelect.value) || 64;
-    const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode, 2, 4);
+    // Use the same broad note pool as the audio engine to ensure consistent mapping
+    const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode, -1, 9);
+    
+    // Find index range for A2 (45) to G4 (67) within the scale
+    let vMinIdx = 0;
+    while (vMinIdx < validNotes.length && validNotes[vMinIdx] < 45) vMinIdx++;
+    let vMaxIdx = validNotes.length - 1;
+    while (vMaxIdx >= 0 && validNotes[vMaxIdx] > 67) vMaxIdx--;
+    
+    // Center point for the algorithms
+    const vMidIdx = Math.floor((vMinIdx + vMaxIdx) / 2);
     
     if (engine.sequencerMode === 'drum') {
         const mapping = engine.classifySlicesForDrumKit();
@@ -1265,7 +1287,8 @@ function generateAlgorithmicPattern(strategy) {
         // Normalize out-of-bounds legacy roots
         let baseIdx = rawIdx < 0 ? 0 : rawIdx;
         let shift = isVerse ? -3 : 5;
-        return Math.max(0, Math.min(validNotes.length - 1, baseIdx + shift));
+        // Strictly clamp to the A2-G4 range indices
+        return Math.max(vMinIdx, Math.min(vMaxIdx, baseIdx + shift));
     };
 
     let seqSliceCounter = 0;
@@ -1298,18 +1321,30 @@ function generateAlgorithmicPattern(strategy) {
     const getOffset = (currentIdx, sliceId) => {
         if (isSeqMode) return 0; // Play sequential slices at their native pitch
         const optimizedIdx = getOptimizedIdx(currentIdx);
-        const slice = engine.slices[sliceId];
-        if (slice && slice.pitch && slice.pitch.midi > 0) {
-            const sliceBaseMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, engine.musicalKey, engine.musicalMode);
-            const sliceBaseIdx = validNotes.indexOf(sliceBaseMidi);
-            if (sliceBaseIdx !== -1) return optimizedIdx - sliceBaseIdx;
+        
+        let baseIdx = -1;
+        if (engine.tuneEnabled) {
+            // In Tune mode, offsets are relative to the master UI root note
+            const rootMidi = ScaleQuantizer.NOTES.indexOf(engine.musicalKey) + (engine.musicalOctave + 4) * 12;
+            baseIdx = validNotes.indexOf(rootMidi);
+        } else {
+            // In Relative mode, offsets are relative to the sample's detected pitch
+            const slice = engine.slices[sliceId];
+            if (slice && slice.pitch && slice.pitch.midi > 0) {
+                const sliceBaseMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, engine.musicalKey, engine.musicalMode);
+                baseIdx = validNotes.indexOf(sliceBaseMidi);
+            }
         }
-        return 0;
+        
+        // Fallback to center if reference point not found
+        if (baseIdx === -1) baseIdx = Math.floor(validNotes.length / 2);
+        
+        return optimizedIdx - baseIdx;
     };
 
     let i = 0;
     if (strategy === 'Brownian') {
-        let currentIdx = Math.floor(validNotes.length / 2) - 7;
+        let currentIdx = vMidIdx;
         let lastLeap = 0;
         while (i < len) {
             if (Math.random() < density) {
@@ -1318,7 +1353,7 @@ function generateAlgorithmicPattern(strategy) {
                 let isChord = duration >= 3 && Math.random() < 0.4;
                 let interval = (Math.abs(lastLeap) >= 3) ? (lastLeap > 0 ? -1 - Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 2)) : (Math.random() < 0.6 ? Math.floor(Math.random() * 5) - 2 : (Math.random() > 0.5 ? 3 : -3));
                 if (Math.abs(interval) >= 3) lastLeap = interval; else lastLeap = 0;
-                currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + interval));
+                currentIdx = Math.max(vMinIdx, Math.min(vMaxIdx, currentIdx + interval));
                 const sliceId = findBestSlice(currentIdx);
                 steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
                 for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
@@ -1326,7 +1361,7 @@ function generateAlgorithmicPattern(strategy) {
             } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Intervallic') {
-        let currentIdx = Math.floor(validNotes.length / 2) - 7;
+        let currentIdx = vMidIdx;
         while (i < len) {
             if (Math.random() < density) {
                 let duration = Math.random() < 0.2 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
@@ -1345,7 +1380,7 @@ function generateAlgorithmicPattern(strategy) {
         const rhythmicPattern = SequencerPatterns.generateEuclidean(len, pulses).steps;
         const arpeggio = [0, 2, 4, 7, 9, 12];
         let arpIdx = 0;
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         while (i < len) {
             if (rhythmicPattern[i].active) {
                 let duration = Math.random() < 0.15 ? [2, 2, 3, 4][Math.floor(Math.random() * 4)] : 1;
@@ -1361,7 +1396,7 @@ function generateAlgorithmicPattern(strategy) {
         }
     } else if (strategy === 'Harmonic') {
         const chordTones = [0, 2, 4];
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         while (i < len) {
             const isPulse = (i % 8 === 0 || i % 8 === 3 || i % 8 === 6);
             if (isPulse && (Math.random() < density * 1.5)) {
@@ -1376,7 +1411,7 @@ function generateAlgorithmicPattern(strategy) {
             } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Markov') {
-        let currentIdx = Math.floor(validNotes.length / 2) - 7;
+        let currentIdx = vMidIdx;
         let lastDir = 1;
         while (i < len) {
             if (Math.random() < density) {
@@ -1386,7 +1421,7 @@ function generateAlgorithmicPattern(strategy) {
                 const stayDir = Math.random() < 0.7;
                 const dir = stayDir ? lastDir : -lastDir;
                 const amount = [1, 1, 2, 3][Math.floor(Math.random() * 4)];
-                currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + (dir * amount)));
+                currentIdx = Math.max(vMinIdx, Math.min(vMaxIdx, currentIdx + (dir * amount)));
                 lastDir = dir;
                 const sliceId = findBestSlice(currentIdx);
                 steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
@@ -1400,7 +1435,7 @@ function generateAlgorithmicPattern(strategy) {
                 let duration = Math.random() < 0.25 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, len - i);
                 let isChord = duration >= 3 && Math.random() < 0.5;
-                const currentIdx = Math.floor(Math.random() * validNotes.length);
+                const currentIdx = vMinIdx + (Math.floor(Math.random() * (vMaxIdx - vMinIdx + 1)));
                 const sliceId = findBestSlice(currentIdx);
                 steps.push({ step: i, active: true, duration, isChord, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
                 for (let j = 1; j < duration; j++) steps.push({ step: i + j, active: false });
@@ -1410,12 +1445,12 @@ function generateAlgorithmicPattern(strategy) {
     } else if (strategy === 'Mirror') {
         let halfSteps = [];
         let hi = 0;
-        let currentIdx = Math.floor(validNotes.length / 2) - 7;
+        let currentIdx = vMidIdx;
         while (hi < len / 2) {
             if (Math.random() < density) {
                 let duration = Math.random() < 0.2 ? [2, 3, 4, 6][Math.floor(Math.random() * 4)] : 1;
                 duration = Math.min(duration, Math.floor(len / 2) - hi);
-                currentIdx = Math.max(0, Math.min(validNotes.length - 1, currentIdx + Math.floor(Math.random() * 5) - 2));
+                currentIdx = Math.max(vMinIdx, Math.min(vMaxIdx, currentIdx + Math.floor(Math.random() * 5) - 2));
                 halfSteps.push({ active: true, idx: currentIdx, duration });
                 for (let j = 1; j < duration; j++) halfSteps.push({ active: false });
                 hi += duration;
@@ -1433,7 +1468,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Pedal') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         let currentIdx = rootIdx + 7;
         for (let j = 0; j < len; j++) {
             const isPedal = j % 2 === 0;
@@ -1448,7 +1483,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Bitwise') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             const isActive = ((j & (j >> 2)) % 3 === 0) && (Math.random() < density * 1.5);
             if (isActive) {
@@ -1461,7 +1496,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Cellular') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         let row = new Array(len).fill(0); row[Math.floor(len / 2)] = 1;
         const nextRow = (r) => {
             let nr = new Array(len).fill(0);
@@ -1480,7 +1515,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Fibonacci') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         let a = 1, b = 1; let fibs = new Set();
         for (let j = 0; j < 12; j++) { fibs.add(a % len); let tmp = a; a = b; b = tmp + b; }
         for (let j = 0; j < len; j++) {
@@ -1491,7 +1526,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Anchor') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             const isAnchor = j % 4 === 0;
             if ((isAnchor || Math.random() < density) && Math.random() < 0.8) {
@@ -1501,7 +1536,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Acid') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         let currentIdx = rootIdx + 7;
         let runLeft = 0;
         let dir = 1;
@@ -1518,7 +1553,7 @@ function generateAlgorithmicPattern(strategy) {
             runLeft--;
         }
     } else if (strategy === 'Phasing') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         const motif = [0, 2, 4, 7, 9].map(n => rootIdx + n);
         for (let i = 0; i < len; i++) {
             if (Math.random() < density) {
@@ -1539,7 +1574,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: i, active: false });
         }
     } else if (strategy === 'Drill') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         while (i < len) {
             if (Math.random() < density * 1.5) {
                 let duration = [1, 1, 2, 3][Math.floor(Math.random() * 4)];
@@ -1553,7 +1588,7 @@ function generateAlgorithmicPattern(strategy) {
             } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Dubstep') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             const isAccent = (j % 16 === 0 || j % 16 === 8);
             if (isAccent || (Math.random() < density * 0.5)) {
@@ -1574,7 +1609,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'House') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             const isOffbeat = j % 4 === 2;
             if (isOffbeat || Math.random() < density) {
@@ -1597,7 +1632,7 @@ function generateAlgorithmicPattern(strategy) {
             } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Synthwave') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             const isDriving = j % 2 === 0;
             if (isDriving && Math.random() < density * 1.5) {
@@ -1607,7 +1642,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Garage') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             if (Math.random() < density * 1.2) {
                 const microTiming = (j % 2 !== 0) ? (Math.random() * 0.02 + 0.01) : 0;
@@ -1617,7 +1652,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Samba') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         const accents = [0, 3, 6, 8, 11, 14];
         for (let j = 0; j < len; j++) {
             if (accents.includes(j % 16) || Math.random() < density) {
@@ -1646,7 +1681,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Folk') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         const progression = [0, 5, 7, 5];
         while (i < len) {
             const bar = Math.floor(i / 16);
@@ -1657,7 +1692,7 @@ function generateAlgorithmicPattern(strategy) {
             i += 2;
         }
     } else if (strategy === 'Disco') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             const isOctave = j % 2 === 0;
             if (Math.random() < density * 1.5) {
@@ -1667,7 +1702,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Grime') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             if (Math.random() < density * 0.6) {
                 const currentIdx = rootIdx + [0, 1, 13][Math.floor(Math.random() * 3)];
@@ -1690,7 +1725,7 @@ function generateAlgorithmicPattern(strategy) {
             } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Classical') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         const alberti = [0, 7, 4, 7];
         for (let j = 0; j < len; j++) {
             const currentIdx = rootIdx + alberti[j % 4] + (Math.floor(j / 16) * 2);
@@ -1698,7 +1733,7 @@ function generateAlgorithmicPattern(strategy) {
             steps.push({ step: j, active: true, sliceId, melodicOffset: getOffset(currentIdx, sliceId) });
         }
     } else if (strategy === 'Neuro') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         while (i < len) {
             const ratchets = [1, 2, 4, 8][Math.floor(Math.pow(Math.random(), 2) * 4)];
             const currentIdx = rootIdx + (i % 12);
@@ -1794,7 +1829,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Drum & Bass') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             if (Math.random() < density * 1.5) {
                 const currentIdx = rootIdx + (j % 4 === 0 ? 0 : Math.floor(Math.random() * 16));
@@ -1803,7 +1838,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Jungle') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         while (i < len) {
             if (Math.random() < density * 1.2) {
                 const isBass = i % 8 < 4;
@@ -1838,7 +1873,7 @@ function generateAlgorithmicPattern(strategy) {
             } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Hardstyle') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             const isOff = j % 4 === 2;
             if (isOff || Math.random() < density * 0.5) {
@@ -1860,7 +1895,7 @@ function generateAlgorithmicPattern(strategy) {
             } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Psytrance') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             if (j % 4 !== 0 && Math.random() < density * 1.8) {
                 const currentIdx = rootIdx + (j % 16 === 14 ? 12 : 0);
@@ -1869,7 +1904,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Slap House') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             if (Math.random() < density * 1.3) {
                 const currentIdx = rootIdx + [0, 0, 12, 12][Math.floor(Math.random() * 4)];
@@ -1878,7 +1913,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Cinematic') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         const cell = [0, 7, 8, 7];
         for (let j = 0; j < len; j++) {
             if (Math.random() < density * 1.5) {
@@ -1888,7 +1923,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Dungeon Synth') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         while (i < len) {
             if (Math.random() < density * 1.5) {
                 const duration = 4;
@@ -1909,7 +1944,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Generative Drone') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         while (i < len) {
             if (Math.random() < density * 2) {
                 const duration = 8;
@@ -1921,7 +1956,7 @@ function generateAlgorithmicPattern(strategy) {
             } else { steps.push({ step: i, active: false }); i++; }
         }
     } else if (strategy === 'Krautrock') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             if (Math.random() < density * 1.8) {
                 const currentIdx = rootIdx + (j % 2 === 0 ? 0 : 12);
@@ -1948,7 +1983,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Spectral') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         const overtones = [0, 12, 19, 24, 28, 31, 34, 36];
         for (let j = 0; j < len; j++) {
             if (Math.random() < density) {
@@ -1967,7 +2002,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Jersey Club') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         const jersey = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0];
         for (let j = 0; j < len; j++) {
             if (jersey[j % 16] && Math.random() < density * 1.8) {
@@ -1977,7 +2012,7 @@ function generateAlgorithmicPattern(strategy) {
             } else steps.push({ step: j, active: false });
         }
     } else if (strategy === 'Phonk') {
-        const rootIdx = Math.floor(validNotes.length / 2) - 14;
+        const rootIdx = vMinIdx;
         for (let j = 0; j < len; j++) {
             if (Math.random() < density * 1.3) {
                 const isCowbell = j % 4 !== 0;
@@ -2181,10 +2216,11 @@ async function loadAndProcessArrayBuffer(arrayBuffer) {
         await engine.loadAudio(arrayBuffer.slice(0)); 
         uploadOverlay.classList.add('hidden');
         workspace.classList.remove('hidden');
+        waveformArea.classList.remove('hidden');
         engine.setMusicalConfig(keySelect.value, modeSelect.value, octaveSelect.value);
-        handleResize();
         // Delay to ensure workspace layout is computed
         await new Promise(resolve => setTimeout(resolve, 100));
+        handleResize();
         await processAudio();
 
         // Auto-generate a random starting pattern to inspire the user immediately
@@ -2478,15 +2514,27 @@ function renderSequencerGrid() {
                 
                 // If melodic pattern, calculate the actual transposed note name
                 if (pattern.type === 'melodic' && stepData.melodicOffset !== undefined && slice.pitch.midi > 0) {
-                    const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode, 2, 4);
-                    const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, engine.musicalKey, engine.musicalMode);
-                    let idx = validNotes.indexOf(closestMidi);
-                    if (idx !== -1) {
-                        idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
-                        let targetMidi = validNotes[idx] + (engine.musicalOctave * 12);
-                        // Clamp to same range as audio engine for visual consistency
+                    const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode, -1, 9);
+                    
+                    if (engine.tuneEnabled) {
+                        const rootMidi = ScaleQuantizer.NOTES.indexOf(engine.musicalKey) + (engine.musicalOctave + 4) * 12;
+                        let baseIdx = validNotes.indexOf(rootMidi);
+                        if (baseIdx === -1) baseIdx = Math.floor(validNotes.length / 2);
+                        
+                        let targetIdx = Math.max(0, Math.min(validNotes.length - 1, baseIdx + stepData.melodicOffset));
+                        let targetMidi = validNotes[targetIdx];
                         targetMidi = Math.max(24, Math.min(102, targetMidi));
                         noteName = PitchDetector.midiToNoteName(targetMidi);
+                    } else {
+                        const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, engine.musicalKey, engine.musicalMode);
+                        let idx = validNotes.indexOf(closestMidi);
+                        if (idx !== -1) {
+                            idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                            const noteDegree = validNotes[idx] % 12;
+                            let targetMidi = noteDegree + (engine.musicalOctave + 4) * 12;
+                            targetMidi = Math.max(24, Math.min(102, targetMidi));
+                            noteName = PitchDetector.midiToNoteName(targetMidi);
+                        }
                     }
                 }
                 
@@ -2997,6 +3045,8 @@ async function startRecording() {
                 await engine.loadAudio(arrayBuffer.slice(0));
                 uploadOverlay.classList.add('hidden');
                 workspace.classList.remove('hidden');
+                waveformArea.classList.remove('hidden');
+                await new Promise(resolve => setTimeout(resolve, 100));
                 handleResize();
                 processAudio();
             } catch (err) {
@@ -3072,6 +3122,7 @@ function saveSettings() {
         autoTimbre: autoTimbreEnabled,
         moreLongNotes: moreLongNotesCheck ? moreLongNotesCheck.checked : false,
         contrast: contrastCheck ? contrastCheck.checked : false,
+        tune: tuneCheck ? tuneCheck.checked : false,
         sliceAssignMode: engine.sliceAssignMode || 'fit',
         sequencerMode: engine.sequencerMode || 'melody'
     };
@@ -3159,6 +3210,10 @@ function loadSettings() {
             engine.chordsEnabled = chordsCheck.checked;
             engine.moreLongNotes = moreLongNotesCheck ? moreLongNotesCheck.checked : false;
             engine.contrastEnabled = contrastCheck ? contrastCheck.checked : false;
+            if (tuneCheck) {
+                tuneCheck.checked = !!settings.tune;
+                engine.tuneEnabled = tuneCheck.checked;
+            }
             engine.sliceAssignMode = settings.sliceAssignMode || 'fit';
             if (seqSliceAssignToggle) {
                 const isSeq = engine.sliceAssignMode === 'sequential';

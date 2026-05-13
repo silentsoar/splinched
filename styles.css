@@ -74,10 +74,9 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.5rem;
-    border-radius: var(--radius-lg);
-    background: linear-gradient(to right, rgba(25, 28, 35, 0.8), rgba(25, 28, 35, 0.4));
-    border: 1px solid var(--border-color);
+    padding: 1rem 0; /* Reduced padding since it's inside a panel */
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .logo {
@@ -266,6 +265,12 @@ label.btn:active {
     pointer-events: none;
 }
 
+.merged-top-panel {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
 .upload-icon {
     font-size: 4rem;
     color: var(--accent-primary);
@@ -275,7 +280,6 @@ label.btn:active {
 
 /* Waveform Section */
 .waveform-section {
-    flex: 0 0 160px;
     display: flex;
     flex-direction: column;
 }

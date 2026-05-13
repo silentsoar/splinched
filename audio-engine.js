@@ -65,6 +65,7 @@ class AudioEngine {
         this.contrastEnabled = false;
         this.contrastPattern = null;
         this.adsrDeviation = 0.0;
+        this.tuneEnabled = false;
         this._setupEffects();
     }
 
@@ -868,6 +869,10 @@ class AudioEngine {
         // If Chromatic mode (MIDI note override provided)
         if (midiNoteOverride > 0 && slice.pitch.midi > 0) {
             rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, midiNoteOverride);
+        } else if (this.tuneEnabled && slice.pitch.midi > 0) {
+            // Auto-Tune behavior: snap to nearest scale note
+            const targetMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+            rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
         }
 
         if (this.sampleEnabled) {
@@ -1285,16 +1290,35 @@ class AudioEngine {
             if (!isDrumHit && (!slice || this.slices.length === 0)) return;
 
             let rate = 1.0;
-            if (!isDrumHit && this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
-                if (slice && slice.pitch && slice.pitch.midi > 0) {
-                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
+            if (!isDrumHit && slice && slice.pitch && slice.pitch.midi > 0) {
+                const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, -1, 9);
+                
+                if (this.tuneEnabled) {
+                    if (stepData.melodicOffset !== undefined) {
+                        // Absolute tuning for melodic patterns
+                        const rootMidi = ScaleQuantizer.NOTES.indexOf(this.musicalKey) + (this.musicalOctave + 4) * 12;
+                        let baseIdx = validNotes.indexOf(rootMidi);
+                        if (baseIdx === -1) baseIdx = Math.floor(validNotes.length / 2);
+                        
+                        let targetIdx = Math.max(0, Math.min(validNotes.length - 1, baseIdx + stepData.melodicOffset));
+                        let targetMidi = validNotes[targetIdx];
+                        targetMidi = Math.max(24, Math.min(102, targetMidi));
+                        rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
+                    } else {
+                        // Auto-Tune behavior: snap to nearest scale note
+                        const targetMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                        rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
+                    }
+                } else if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
+                    // Relative tuning for melodic patterns
                     const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
                     let idx = validNotes.indexOf(closestMidi);
                     if (idx !== -1) {
                         idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
-                        let targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                        const noteDegree = validNotes[idx] % 12;
+                        let targetMidi = noteDegree + (this.musicalOctave + 4) * 12;
                         targetMidi = Math.max(24, Math.min(102, targetMidi));
-                        rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
+                        rate = ScaleQuantizer.getPlaybackRate(closestMidi, targetMidi);
                     }
                 }
             }
@@ -1338,14 +1362,27 @@ class AudioEngine {
                     } else if (slice && slice.pitch && slice.pitch.midi > 0) {
                         let targetMidi = slice.pitch.midi;
                         if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
-                            const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
-                            const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
-                            let idx = validNotes.indexOf(closestMidi);
-                            if (idx !== -1) {
-                                idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
-                                targetMidi = validNotes[idx] + (this.musicalOctave * 12);
-                                targetMidi = Math.max(24, Math.min(102, targetMidi));
+                            const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, -1, 9);
+                            
+                            if (this.tuneEnabled) {
+                                // Match the absolute tuning of the sample
+                                const rootMidi = ScaleQuantizer.NOTES.indexOf(this.musicalKey) + (this.musicalOctave + 4) * 12;
+                                let baseIdx = validNotes.indexOf(rootMidi);
+                                if (baseIdx === -1) baseIdx = Math.floor(validNotes.length / 2);
+                                
+                                let targetIdx = Math.max(0, Math.min(validNotes.length - 1, baseIdx + stepData.melodicOffset));
+                                targetMidi = validNotes[targetIdx];
+                            } else {
+                                // Corrected relative tuning (no double-octave)
+                                const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                                let idx = validNotes.indexOf(closestMidi);
+                                if (idx !== -1) {
+                                    idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                                    const noteDegree = validNotes[idx] % 12;
+                                    targetMidi = noteDegree + (this.musicalOctave + 4) * 12;
+                                }
                             }
+                            targetMidi = Math.max(24, Math.min(102, targetMidi));
                         }
                         
                         const strategy = this.seqPattern.strategy || 'default';
@@ -1511,19 +1548,39 @@ class AudioEngine {
                     if (!isDrumHit && (!slice || this.slices.length === 0)) return;
 
                     let rate = 1.0;
-                    if (!isDrumHit && this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
-                        if (slice && slice.pitch && slice.pitch.midi > 0) {
-                            const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
+                    if (!isDrumHit && slice && slice.pitch && slice.pitch.midi > 0) {
+                        const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, -1, 9);
+                        
+                        if (this.tuneEnabled) {
+                            if (stepData.melodicOffset !== undefined) {
+                                // Absolute tuning for melodic patterns
+                                const rootMidi = ScaleQuantizer.NOTES.indexOf(this.musicalKey) + (this.musicalOctave + 4) * 12;
+                                let baseIdx = validNotes.indexOf(rootMidi);
+                                if (baseIdx === -1) baseIdx = Math.floor(validNotes.length / 2);
+                                
+                                let targetIdx = Math.max(0, Math.min(validNotes.length - 1, baseIdx + stepData.melodicOffset));
+                                let targetMidi = validNotes[targetIdx];
+                                targetMidi = Math.max(24, Math.min(102, targetMidi));
+                                rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
+                            } else {
+                                // Auto-Tune behavior: snap to nearest scale note
+                                const targetMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                                rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
+                            }
+                        } else if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
+                            // Relative tuning for melodic patterns
                             const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
                             let idx = validNotes.indexOf(closestMidi);
                             if (idx !== -1) {
                                 idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
-                                let targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                                const noteDegree = validNotes[idx] % 12;
+                                let targetMidi = noteDegree + (this.musicalOctave + 4) * 12;
                                 targetMidi = Math.max(24, Math.min(102, targetMidi));
-                                rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
+                                rate = ScaleQuantizer.getPlaybackRate(closestMidi, targetMidi);
                             }
                         }
                     }
+
 
                     let ratchets = stepData.ratchets || 1;
                     const noteSteps = stepData.duration || 1;
@@ -1561,14 +1618,25 @@ class AudioEngine {
                             } else if (slice && slice.pitch && slice.pitch.midi > 0) {
                                 let targetMidi = slice.pitch.midi;
                                 if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
-                                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
-                                    const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
-                                    let idx = validNotes.indexOf(closestMidi);
-                                    if (idx !== -1) {
-                                        idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
-                                        targetMidi = validNotes[idx] + (this.musicalOctave * 12);
-                                        targetMidi = Math.max(24, Math.min(102, targetMidi));
+                                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, -1, 9);
+                                    
+                                    if (this.tuneEnabled) {
+                                        const rootMidi = ScaleQuantizer.NOTES.indexOf(this.musicalKey) + (this.musicalOctave + 4) * 12;
+                                        let baseIdx = validNotes.indexOf(rootMidi);
+                                        if (baseIdx === -1) baseIdx = Math.floor(validNotes.length / 2);
+                                        
+                                        let targetIdx = Math.max(0, Math.min(validNotes.length - 1, baseIdx + stepData.melodicOffset));
+                                        targetMidi = validNotes[targetIdx];
+                                    } else {
+                                        const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                                        let idx = validNotes.indexOf(closestMidi);
+                                        if (idx !== -1) {
+                                            idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                                            const noteDegree = validNotes[idx] % 12;
+                                            targetMidi = noteDegree + (this.musicalOctave + 4) * 12;
+                                        }
                                     }
+                                    targetMidi = Math.max(24, Math.min(102, targetMidi));
                                 }
                                 const strategy = this.seqPattern.strategy || 'default';
                                 this._createTone(targetMidi, t, holdDur, offlineCtx, finalDest, volMult * this.toneLevel, isLong, strategy);

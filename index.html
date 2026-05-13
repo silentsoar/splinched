@@ -16,24 +16,46 @@
 
 <body>
     <div class="app-container">
-        <header class="app-header">
-            <div class="logo">
-                <i class="fas fa-wave-square"></i>
-                <h1>Splinched</h1>
+        <!-- Merged Header & Waveform -->
+        <div class="panel glass merged-top-panel">
+            <header class="app-header">
+                <div class="logo">
+                    <i class="fas fa-wave-square"></i>
+                    <h1>Splinched</h1>
+                </div>
+                <div class="header-controls">
+                    <button class="btn btn-secondary midi-status" id="midi-status" title="Connect MIDI">
+                        <i class="fas fa-plug"></i> Connect MIDI
+                    </button>
+                    <button id="btn-record" class="btn btn-secondary" title="Record Audio">
+                        <i class="fas fa-microphone"></i> Record
+                    </button>
+                    <label for="audio-upload" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Upload Audio
+                    </label>
+                    <input type="file" id="audio-upload" accept="audio/*" class="hidden-input">
+                </div>
+            </header>
+
+            <div id="waveform-area" class="waveform-section hidden">
+                <div class="section-header">
+                    <div style="display: flex; flex-direction: column;">
+                        <h2>Waveform <span class="hint">(Click slices to play)</span></h2>
+                        <div id="filename-display"
+                            style="font-size: 0.8rem; color: var(--accent-secondary); margin-top: 4px;"></div>
+                    </div>
+                    <div class="playback-controls">
+                        <button id="btn-toggle-play-all" class="btn btn-icon" title="Toggle Playback"><i class="fas fa-play"></i></button>
+                    </div>
+                </div>
+                <div class="canvas-container" id="canvas-container">
+                    <div id="playhead" class="playhead"
+                        style="position: absolute; top: 0; bottom: 0; width: 2px; background-color: var(--accent-danger); left: 0; display: none; pointer-events: none; z-index: 10; box-shadow: 0 0 8px var(--accent-danger);">
+                    </div>
+                    <canvas id="waveform-canvas"></canvas>
+                </div>
             </div>
-            <div class="header-controls">
-                <button class="btn btn-secondary midi-status" id="midi-status" title="Connect MIDI">
-                    <i class="fas fa-plug"></i> Connect MIDI
-                </button>
-                <button id="btn-record" class="btn btn-secondary" title="Record Audio">
-                    <i class="fas fa-microphone"></i> Record
-                </button>
-                <label for="audio-upload" class="btn btn-primary">
-                    <i class="fas fa-upload"></i> Upload Audio
-                </label>
-                <input type="file" id="audio-upload" accept="audio/*" class="hidden-input">
-            </div>
-        </header>
+        </div>
 
         <main class="app-main">
             <!-- Upload Overlay -->
@@ -50,27 +72,6 @@
             </div>
 
             <div class="workspace hidden" id="workspace">
-                <!-- Top Panel: Waveform -->
-                <div class="waveform-section panel glass">
-                    <div class="section-header">
-                        <div style="display: flex; flex-direction: column;">
-                            <h2>Waveform <span class="hint">(Click slices to play)</span></h2>
-                            <div id="filename-display"
-                                style="font-size: 0.8rem; color: var(--accent-secondary); margin-top: 4px;"></div>
-                        </div>
-                            <div class="playback-controls">
-                                <button id="btn-toggle-play-all" class="btn btn-icon" title="Toggle Playback"><i class="fas fa-play"></i></button>
-                            </div>
-                    </div>
-                    <div class="canvas-container" id="canvas-container">
-                        <canvas id="waveform-canvas"></canvas>
-                        <div id="playhead"
-                            style="position: absolute; top: 0; bottom: 0; width: 2px; background-color: var(--accent-danger); left: 0; display: none; pointer-events: none; z-index: 10; box-shadow: 0 0 8px var(--accent-danger);">
-                        </div>
-                        <!-- Click overlay generated dynamically -->
-                    </div>
-                </div>
-
                 <!-- Middle Panel: Configuration & Sequencer -->
                 <div class="middle-layout">
                     <!-- Left: Sequencer -->
@@ -240,6 +241,10 @@
                             <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
                                 <label style="margin: 0;" for="seq-contrast" title="Generate parallel complementary pattern">Contrast</label>
                                 <input type="checkbox" id="seq-contrast" class="custom-checkbox">
+                            </div>
+                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
+                                <label style="margin: 0;" for="seq-tune" title="Tune slices to exact pitch of the step">Tune</label>
+                                <input type="checkbox" id="seq-tune" class="custom-checkbox">
                             </div>
                             <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
                                 <span class="toggle-label active-primary" id="label-chorus" style="cursor: pointer;">Chorus</span>
