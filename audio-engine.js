@@ -223,7 +223,6 @@ class AudioEngine {
     }
 
     async loadAudio(arrayBuffer) {
-        if (this.ctx.state === 'suspended') await this.ctx.resume();
         this.buffer = await this.ctx.decodeAudioData(arrayBuffer);
         this._optimizeCompressor(); // Adapt to new sample levels
         return this.buffer;

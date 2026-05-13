@@ -481,8 +481,6 @@ function hideLoading() {
 // --- Initialization ---
 
 async function init() {
-    localStorage.clear();
-    indexedDB.deleteDatabase('SplinchedDB');
     loadCustomPatterns();
     populatePatterns();
     setupEventListeners();
@@ -536,7 +534,7 @@ async function init() {
 
 function populatePatterns(preserveSelection = false) {
     const prevValue = patternSelect.value;
-    patternSelect.innerHTML = '';
+    patternSelect.textContent = '';
     
     const drumGroup = document.createElement('optgroup');
     drumGroup.label = "Drum Patterns";
@@ -596,17 +594,26 @@ function setupEventListeners() {
                 if (isConnected) {
                     midiStatus.classList.add('connected');
                     midiStatus.title = "MIDI Device Connected";
-                    midiStatus.innerHTML = '<i class="fas fa-plug"></i> MIDI Connected';
+                    midiStatus.textContent = '';
+                    const icon = document.createElement('i');
+                    icon.className = 'fas fa-plug';
+                    midiStatus.appendChild(icon);
+                    midiStatus.appendChild(document.createTextNode(' MIDI Connected'));
                 } else {
                     midiStatus.classList.remove('connected');
                     midiStatus.title = "MIDI Device Disconnected";
-                    midiStatus.innerHTML = '<i class="fas fa-plug"></i> Connect MIDI';
+                    midiStatus.textContent = '';
+                    const icon = document.createElement('i');
+                    icon.className = 'fas fa-plug';
+                    midiStatus.appendChild(icon);
+                    midiStatus.appendChild(document.createTextNode(' Connect MIDI'));
                 }
             }
         );
     });
     // Upload & Drag Drop
-    audioUploadInput.addEventListener('change', (e) => {
+    audioUploadInput.addEventListener('change', async (e) => {
+        if (engine.ctx.state === 'suspended') await engine.ctx.resume();
         if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
     });
     document.addEventListener('dragover', (e) => { e.preventDefault(); uploadOverlay.classList.add('drag-over'); });
@@ -825,7 +832,14 @@ function setupEventListeners() {
         else options = [8, 16, 32, 64];
 
         const currentVal = algoLenSelect.value;
-        algoLenSelect.innerHTML = options.map(opt => `<option value="${opt}" ${opt == currentVal ? 'selected' : ''}>${opt}</option>`).join('');
+        algoLenSelect.textContent = '';
+        options.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            if (opt == currentVal) option.selected = true;
+            algoLenSelect.appendChild(option);
+        });
     }
     sampleLevelSlider.addEventListener('input', (e) => {
         updateSliderUI(e.target);
@@ -991,8 +1005,19 @@ function setupEventListeners() {
 
 
 
-    btnToggleSeq.addEventListener('click', () => {
-        if (engine.ctx.state === 'suspended') engine.ctx.resume();
+    // Resume AudioContext on first user interaction
+    const resumeAudio = () => {
+        if (engine.ctx.state === 'suspended') {
+            engine.ctx.resume();
+        }
+    };
+    window.addEventListener('click', resumeAudio, { once: true });
+    window.addEventListener('mousedown', resumeAudio, { once: true });
+    window.addEventListener('touchstart', resumeAudio, { once: true });
+    window.addEventListener('keydown', resumeAudio, { once: true });
+
+    btnToggleSeq.addEventListener('click', async () => {
+        if (engine.ctx.state === 'suspended') await engine.ctx.resume();
         
         if (engine.seqIsPlaying) {
             engine.stopSequencer();
@@ -1101,6 +1126,7 @@ function setupEventListeners() {
     const btnLoadDemo = document.getElementById('btn-load-demo');
     if (btnLoadDemo) {
         btnLoadDemo.addEventListener('click', async (e) => {
+            if (engine.ctx.state === 'suspended') await engine.ctx.resume();
             e.stopPropagation();
             showLoading('Downloading Demo', 'Fetching professional sample pack...');
             try {
@@ -2290,12 +2316,15 @@ function renderSequencerGrid() {
             const headerEl = document.createElement('div');
             headerEl.className = 'drum-track-header';
             headerEl.style.cssText = 'display:flex; flex-direction:column; justify-content:center; padding:0 8px; background:rgba(0,0,0,0.3); border-right:2px solid var(--border-color); border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.75rem; font-weight:bold; color:var(--text-color); user-select:none;';
-            headerEl.innerHTML = `
-                <div>${labels[track.instrument]}</div>
-                <div style="font-size:0.55rem; color:var(--accent-primary); cursor:pointer;" title="Click to Audition Slice">Slice ${track.sliceId + 1}</div>
-            `;
-            
-            const sliceBadge = headerEl.querySelector('div:last-child');
+            const instLabel = document.createElement('div');
+            instLabel.textContent = labels[track.instrument] || 'Unknown';
+            headerEl.appendChild(instLabel);
+
+            const sliceBadge = document.createElement('div');
+            sliceBadge.style.cssText = 'font-size:0.55rem; color:var(--accent-primary); cursor:pointer;';
+            sliceBadge.title = "Click to Audition Slice";
+            sliceBadge.textContent = `Slice ${track.sliceId + 1}`;
+
             sliceBadge.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (engine.slices && engine.slices[track.sliceId]) {
@@ -2329,17 +2358,31 @@ function renderSequencerGrid() {
                     else if (track.instrument === 'chat' || track.instrument === 'ohat') stepEl.style.borderColor = '#10b981';
                     else stepEl.style.borderColor = 'var(--accent-primary)';
                     
-                    let inner = `<div style="font-size:0.45rem; color:rgba(255,255,255,0.2); position:absolute; top:2px; left:2px; pointer-events:none;">${s + 1}</div>`;
+                    stepEl.textContent = '';
+                    const numDiv = document.createElement('div');
+                    numDiv.style.cssText = 'font-size:0.45rem; color:rgba(255,255,255,0.2); position:absolute; top:2px; left:2px; pointer-events:none;';
+                    numDiv.textContent = s + 1;
+                    stepEl.appendChild(numDiv);
+
                     if (stepData && stepData.ratchets && stepData.ratchets > 1) {
-                        inner += `<span class="ratchet-badge" style="font-size:0.45rem;">x${stepData.ratchets}</span>`;
+                        const badge = document.createElement('span');
+                        badge.className = 'ratchet-badge';
+                        badge.style.fontSize = '0.45rem';
+                        badge.textContent = `x${stepData.ratchets}`;
+                        stepEl.appendChild(badge);
                     }
-                    stepEl.innerHTML = inner;
+
                 };
 
                 if (stepData && stepData.active) {
                     applyActiveStyles();
                 } else {
-                    stepEl.innerHTML = `<div style="font-size:0.45rem; color:rgba(255,255,255,0.2); position:absolute; top:2px; left:2px; pointer-events:none;">${s + 1}</div>`;
+                    stepEl.textContent = '';
+                    const numDiv = document.createElement('div');
+                    numDiv.style.cssText = 'font-size:0.45rem; color:rgba(255,255,255,0.2); position:absolute; top:2px; left:2px; pointer-events:none;';
+                    numDiv.textContent = s + 1;
+                    stepEl.appendChild(numDiv);
+
                 }
 
                 if (engine.seqIsPlaying && engine.seqCurrentStep === s) {
@@ -2354,7 +2397,12 @@ function renderSequencerGrid() {
                         } else {
                             stepEl.classList.remove('active');
                             stepEl.style.borderColor = '';
-                            stepEl.innerHTML = `<div style="font-size:0.45rem; color:rgba(255,255,255,0.2); position:absolute; top:2px; left:2px; pointer-events:none;">${s + 1}</div>`;
+                            stepEl.textContent = '';
+                            const numDiv = document.createElement('div');
+                            numDiv.style.cssText = 'font-size:0.45rem; color:rgba(255,255,255,0.2); position:absolute; top:2px; left:2px; pointer-events:none;';
+                            numDiv.textContent = s + 1;
+                            stepEl.appendChild(numDiv);
+
                         }
                         saveCustomPatterns();
                     }
@@ -2446,10 +2494,19 @@ function renderSequencerGrid() {
             }
         }
         
-        stepEl.innerHTML = `
-            <div style="font-size: 0.75rem; font-weight: 600; margin-bottom: 2px; pointer-events: none;">${i + 1}</div>
-            <div class="step-slice-info" draggable="true" style="font-size: 0.5rem; color: var(--accent-secondary); font-weight: bold; cursor: grab;">${sliceInfoStr}</div>
-        `;
+        stepEl.textContent = '';
+        const indexDiv = document.createElement('div');
+        indexDiv.style.cssText = 'font-size: 0.75rem; font-weight: 600; margin-bottom: 2px; pointer-events: none;';
+        indexDiv.textContent = i + 1;
+        stepEl.appendChild(indexDiv);
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'step-slice-info';
+        infoDiv.draggable = true;
+        infoDiv.style.cssText = 'font-size: 0.5rem; color: var(--accent-secondary); font-weight: bold; cursor: grab;';
+        infoDiv.textContent = sliceInfoStr;
+        stepEl.appendChild(infoDiv);
+
         stepEl.style.flexDirection = 'column';
         stepEl.style.alignItems = 'center';
         stepEl.style.justifyContent = 'center';
@@ -2476,7 +2533,6 @@ function renderSequencerGrid() {
             }
         }
         
-        const infoDiv = stepEl.querySelector('.step-slice-info');
         infoDiv.addEventListener('dragstart', (e) => {
             e.stopPropagation();
             if (engine.slices && engine.slices.length > 0) {
@@ -2562,7 +2618,7 @@ function renderSequencerGrid() {
 }
 
 function renderPads() {
-    padsContainer.innerHTML = '';
+    padsContainer.textContent = '';
     keyMap = {};
     
     if (!engine.slices || engine.slices.length === 0) return;
@@ -2600,11 +2656,23 @@ function renderPads() {
         
         const pitchText = slice.pitch ? slice.pitch.noteName : '--';
 
-        pad.innerHTML = `
-            ${keyChar ? `<span class="pad-key">${keyChar}</span>` : ''}
-            <span class="pad-pitch">${pitchText}</span>
-            <span class="pad-number">S${sliceId + 1}</span>
-        `;
+        pad.textContent = '';
+        if (keyChar) {
+            const keySpan = document.createElement('span');
+            keySpan.className = 'pad-key';
+            keySpan.textContent = keyChar;
+            pad.appendChild(keySpan);
+        }
+        const pitchSpan = document.createElement('span');
+        pitchSpan.className = 'pad-pitch';
+        pitchSpan.textContent = pitchText;
+        pad.appendChild(pitchSpan);
+
+        const numSpan = document.createElement('span');
+        numSpan.className = 'pad-number';
+        numSpan.textContent = `S${sliceId + 1}`;
+        pad.appendChild(numSpan);
+
 
         pad.addEventListener('mousedown', () => triggerPad(index));
         pad.addEventListener('mouseup', () => pad.classList.remove('active'));
@@ -3015,8 +3083,21 @@ function loadCustomPatterns() {
     if (data) {
         try {
             const arr = JSON.parse(data);
-            arr.forEach(p => SequencerPatterns.push(p));
-        } catch(e) {}
+            if (Array.isArray(arr)) {
+                arr.forEach(p => {
+                    // Basic validation for pattern object
+                    if (p && typeof p === 'object' && p.id && p.name) {
+                        // Ensure name and id are strings
+                        p.id = String(p.id);
+                        p.name = String(p.name).substring(0, 100);
+                        p.isCustom = true;
+                        SequencerPatterns.push(p);
+                    }
+                });
+            }
+        } catch(e) {
+            console.warn("Failed to load custom patterns", e);
+        }
     }
 }
 
@@ -3030,6 +3111,7 @@ function loadSettings() {
     if (data) {
         try {
             const settings = JSON.parse(data);
+            if (!settings || typeof settings !== 'object') return;
             algoSelect.value = settings.algo || 'transient';
             targetSlicesSelect.value = settings.slices || '32';
             keySelect.value = settings.key || 'A';
