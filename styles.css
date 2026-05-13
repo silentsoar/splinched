@@ -286,7 +286,7 @@ label.btn:active {
     align-items: center;
     margin-bottom: 1rem;
     gap: 1rem;
-    cursor: pointer;
+    cursor: default;
     user-select: none;
     flex-wrap: nowrap; /* Prevent chevron wrapping */
 }
@@ -294,10 +294,6 @@ label.btn:active {
 .section-header > div:first-child {
     min-width: 0; /* Allow title to shrink */
     flex: 1;
-}
-
-.section-header:hover h2 {
-    color: var(--accent-primary);
 }
 
 .sub-header {

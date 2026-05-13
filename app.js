@@ -211,9 +211,13 @@ const toneLevelSlider = document.getElementById('seq-tone-level');
 const valToneLevel = document.getElementById('val-tone-level');
 const chordsCheck = document.getElementById('seq-tone-chords');
 const moreLongNotesCheck = document.getElementById('seq-more-long-notes');
+const contrastCheck = document.getElementById('seq-contrast');
 const partToggle = document.getElementById('seq-part-toggle');
 const labelChorus = document.getElementById('label-chorus');
 const labelVerse = document.getElementById('label-verse');
+const seqSliceAssignToggle = document.getElementById('seq-slice-assign-toggle');
+const labelFit = document.getElementById('label-fit');
+const labelSeq = document.getElementById('label-seq');
 const autoBpmBtn = document.getElementById('btn-auto-bpm');
 const algoLenSelect = document.getElementById('algo-len');
 const seqMeterSelect = document.getElementById('seq-meter');
@@ -825,6 +829,13 @@ function setupEventListeners() {
         });
     }
 
+    if (contrastCheck) {
+        contrastCheck.addEventListener('change', (e) => {
+            engine.contrastEnabled = e.target.checked;
+            saveSettings();
+        });
+    }
+
     if (partToggle) {
         const updatePartToggleUI = () => {
             const isVerse = partToggle.checked;
@@ -850,6 +861,35 @@ function setupEventListeners() {
             labelVerse.addEventListener('click', () => {
                 partToggle.checked = true;
                 updatePartToggleUI();
+            });
+        }
+    }
+
+    if (seqSliceAssignToggle) {
+        const updateSliceAssignUI = () => {
+            const isSeq = seqSliceAssignToggle.checked;
+            engine.sliceAssignMode = isSeq ? 'sequential' : 'fit';
+            if (labelFit && labelSeq) {
+                labelFit.className = isSeq ? 'toggle-label' : 'toggle-label active-primary';
+                labelSeq.className = isSeq ? 'toggle-label active-secondary' : 'toggle-label';
+                labelFit.style.color = isSeq ? 'var(--text-muted)' : '';
+                labelSeq.style.color = isSeq ? '' : 'var(--text-muted)';
+            }
+            saveSettings();
+            const currentStrategy = Object.keys(algoButtons).find(k => algoButtons[k] && algoButtons[k].classList.contains('btn-primary')) || 'Harmonic';
+            generateAlgorithmicPattern(currentStrategy);
+        };
+        seqSliceAssignToggle.addEventListener('change', updateSliceAssignUI);
+        if (labelFit) {
+            labelFit.addEventListener('click', () => {
+                seqSliceAssignToggle.checked = false;
+                updateSliceAssignUI();
+            });
+        }
+        if (labelSeq) {
+            labelSeq.addEventListener('click', () => {
+                seqSliceAssignToggle.checked = true;
+                updateSliceAssignUI();
             });
         }
     }
@@ -1036,7 +1076,15 @@ function generateAlgorithmicPattern(strategy) {
         return Math.max(0, Math.min(validNotes.length - 1, baseIdx + shift));
     };
 
+    let seqSliceCounter = 0;
+    const isSeqMode = engine.sliceAssignMode === 'sequential';
+
     const findBestSlice = (targetIdx) => {
+        if (isSeqMode) {
+            const assignedId = seqSliceCounter % engine.slices.length;
+            seqSliceCounter++;
+            return assignedId;
+        }
         const optimizedIdx = getOptimizedIdx(targetIdx);
         const targetMidi = validNotes[optimizedIdx];
         let bestSliceId = 0;
@@ -1051,6 +1099,7 @@ function generateAlgorithmicPattern(strategy) {
     };
 
     const getOffset = (currentIdx, sliceId) => {
+        if (isSeqMode) return 0; // Play sequential slices at their native pitch
         const optimizedIdx = getOptimizedIdx(currentIdx);
         const slice = engine.slices[sliceId];
         if (slice && slice.pitch && slice.pitch.midi > 0) {
@@ -1895,6 +1944,28 @@ function generateAlgorithmicPattern(strategy) {
         isCustom: true
     };
     
+    let contrastSteps = [];
+    for (let s = 0; s < len; s++) {
+        const mainStep = steps[s] || { active: false };
+        let cActive = !mainStep.active && (s % 2 !== 0 || Math.random() < 0.4);
+        if (cActive) {
+            let baseTarget = mainStep.sliceId !== undefined ? mainStep.sliceId : s;
+            let compIdx = Math.max(0, Math.min(validNotes.length - 1, (baseTarget + 4) % validNotes.length));
+            let cSliceId = findBestSlice(compIdx);
+            contrastSteps.push({
+                step: s,
+                active: true,
+                duration: 1,
+                isChord: false,
+                sliceId: cSliceId,
+                melodicOffset: getOffset(compIdx, cSliceId)
+            });
+        } else {
+            contrastSteps.push({ step: s, active: false });
+        }
+    }
+    engine.contrastPattern = contrastSteps;
+
     SequencerPatterns.push(newPat);
     saveCustomPatterns();
     populatePatterns();
@@ -2625,7 +2696,9 @@ function saveSettings() {
         autoBpm: autoBpmEnabled,
         timbre: timbreSelect ? timbreSelect.value : 'pure-sine',
         autoTimbre: autoTimbreEnabled,
-        moreLongNotes: moreLongNotesCheck ? moreLongNotesCheck.checked : false
+        moreLongNotes: moreLongNotesCheck ? moreLongNotesCheck.checked : false,
+        contrast: contrastCheck ? contrastCheck.checked : false,
+        sliceAssignMode: engine.sliceAssignMode || 'fit'
     };
     localStorage.setItem('splinchedSettings', JSON.stringify(settings));
 }
@@ -2687,12 +2760,27 @@ function loadSettings() {
             if (moreLongNotesCheck) {
                 moreLongNotesCheck.checked = !!settings.moreLongNotes;
             }
+            if (contrastCheck) {
+                contrastCheck.checked = !!settings.contrast;
+            }
             
             // Sync engine state
             engine.sampleLevel = toLogPercent(parseInt(sampleLevelSlider.value));
             engine.toneLevel = toLogPercent(parseInt(toneLevelSlider.value));
             engine.chordsEnabled = chordsCheck.checked;
             engine.moreLongNotes = moreLongNotesCheck ? moreLongNotesCheck.checked : false;
+            engine.contrastEnabled = contrastCheck ? contrastCheck.checked : false;
+            engine.sliceAssignMode = settings.sliceAssignMode || 'fit';
+            if (seqSliceAssignToggle) {
+                const isSeq = engine.sliceAssignMode === 'sequential';
+                seqSliceAssignToggle.checked = isSeq;
+                if (labelFit && labelSeq) {
+                    labelFit.className = isSeq ? 'toggle-label' : 'toggle-label active-primary';
+                    labelSeq.className = isSeq ? 'toggle-label active-secondary' : 'toggle-label';
+                    labelFit.style.color = isSeq ? 'var(--text-muted)' : '';
+                    labelSeq.style.color = isSeq ? '' : 'var(--text-muted)';
+                }
+            }
             if (partToggle) {
                 partToggle.checked = (settings.part === 'verse');
                 engine.songPart = settings.part || 'chorus';
@@ -2706,7 +2794,11 @@ function loadSettings() {
 
             // Load FX values
             if (settings.reverb !== undefined) fxReverb.value = settings.reverb;
-            if (settings.delay !== undefined) fxDelay.value = settings.delay;
+            if (settings.delay !== undefined) {
+                fxDelay.value = settings.delay <= 1.0 ? 250 : settings.delay;
+            } else {
+                fxDelay.value = 250;
+            }
             if (settings.distort !== undefined) fxDistort.value = settings.distort;
             if (settings.smartComp !== undefined && fxSmartComp) fxSmartComp.checked = settings.smartComp;
             if (settings.eqLow !== undefined) fxEqLow.value = settings.eqLow;
@@ -2870,11 +2962,10 @@ if (fxReverb) {
 }
 if (fxDelay) {
     fxDelay.addEventListener('input', (e) => {
-        let val = parseFloat(e.target.value);
-        if (val < 0.05) { val = 0; e.target.value = 0; }
+        let val = parseInt(e.target.value);
         engine.updateEffects({ delay: val });
-        valDelay.textContent = Math.round(val * 100) + '%';
-        e.target.classList.toggle('is-default', val === 0);
+        valDelay.textContent = val + 'ms';
+        e.target.classList.toggle('is-default', val === 250);
     });
 }
 if (fxDistort) {
