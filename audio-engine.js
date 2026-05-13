@@ -1032,6 +1032,61 @@ class AudioEngine {
         });
     }
 
+    classifySlicesForDrumKit() {
+        const instruments = ['kick', 'snare', 'clap', 'chat', 'ohat', 'tom', 'perc', 'cymbal'];
+        let mapping = {};
+        
+        if (!this.slices || this.slices.length === 0) {
+            instruments.forEach((inst, idx) => mapping[inst] = 0);
+            return mapping;
+        }
+
+        let candidates = {};
+        instruments.forEach(inst => candidates[inst] = []);
+        
+        this.slices.forEach((slice, idx) => {
+            if (idx === 0 && this.slices.length > 1) return;
+            if (slice && slice.pitch && slice.pitch.drumType) {
+                const t = slice.pitch.drumType;
+                if (candidates[t]) candidates[t].push(idx);
+            }
+        });
+
+        const fallbacks = {
+            kick: ['tom', 'perc'],
+            snare: ['clap', 'chat', 'perc'],
+            clap: ['snare', 'chat', 'perc'],
+            chat: ['ohat', 'cymbal', 'snare'],
+            ohat: ['cymbal', 'chat', 'clap'],
+            tom: ['kick', 'perc'],
+            perc: ['tom', 'snare'],
+            cymbal: ['ohat', 'chat']
+        };
+
+        instruments.forEach((inst, trackIdx) => {
+            if (candidates[inst] && candidates[inst].length > 0) {
+                mapping[inst] = candidates[inst][0];
+            } else {
+                let found = false;
+                if (fallbacks[inst]) {
+                    for (let fb of fallbacks[inst]) {
+                        if (candidates[fb] && candidates[fb].length > 0) {
+                            mapping[inst] = candidates[fb][0];
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if (!found) {
+                    const validLen = this.slices.length > 1 ? this.slices.length - 1 : 1;
+                    mapping[inst] = this.slices.length > 1 ? 1 + (trackIdx % validLen) : 0;
+                }
+            }
+        });
+        
+        return mapping;
+    }
+
     _playKick(time, ctx, destination) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -1046,6 +1101,148 @@ class AudioEngine {
 
         osc.start(time);
         osc.stop(time + 0.5);
+    }
+
+    _createSynthDrumHit(instrument, time, holdDur, ctx, destination, gainMult = 1.0) {
+        const dest = destination || (this.fxEnabled ? this.eqLow : this.globalGain);
+        const gainNode = ctx.createGain();
+        gainNode.connect(dest);
+        
+        const createNoiseBuffer = (dur) => {
+            const frameCount = ctx.sampleRate * dur;
+            const buffer = ctx.createBuffer(1, frameCount, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < frameCount; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        };
+
+        const subNodes = [];
+
+        if (instrument === 'kick') {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(120, time);
+            osc.frequency.exponentialRampToValueAtTime(40, time + 0.08);
+            
+            gainNode.gain.setValueAtTime(0.8 * gainMult, time);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
+            
+            osc.connect(gainNode);
+            subNodes.push({ source: osc, end: time + 0.25 });
+        } else if (instrument === 'snare') {
+            const osc = ctx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(180, time);
+            osc.frequency.exponentialRampToValueAtTime(120, time + 0.05);
+            
+            const toneGain = ctx.createGain();
+            toneGain.gain.setValueAtTime(0.5 * gainMult, time);
+            toneGain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+            osc.connect(toneGain); toneGain.connect(dest);
+            
+            const noise = ctx.createBufferSource();
+            noise.buffer = createNoiseBuffer(0.2);
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(1000, time);
+            
+            gainNode.gain.setValueAtTime(0.6 * gainMult, time);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+            
+            noise.connect(filter); filter.connect(gainNode);
+            subNodes.push({ source: osc, end: time + 0.18 }, { source: noise, end: time + 0.18 });
+        } else if (instrument === 'clap') {
+            const noiseBuf = createNoiseBuffer(0.3);
+            [0, 0.015, 0.03].forEach((offset, idx) => {
+                const noise = ctx.createBufferSource();
+                noise.buffer = noiseBuf;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(1500 + idx * 200, time + offset);
+                filter.Q.setValueAtTime(1.5, time + offset);
+                
+                const curGain = ctx.createGain();
+                curGain.gain.setValueAtTime(0.4 * gainMult, time + offset);
+                curGain.gain.exponentialRampToValueAtTime(0.001, time + offset + 0.15);
+                
+                noise.connect(filter); filter.connect(curGain); curGain.connect(dest);
+                subNodes.push({ source: noise, start: time + offset, end: time + offset + 0.15 });
+            });
+        } else if (instrument === 'chat') {
+            const noise = ctx.createBufferSource();
+            noise.buffer = createNoiseBuffer(0.1);
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(7000, time);
+            
+            gainNode.gain.setValueAtTime(0.5 * gainMult, time);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+            
+            noise.connect(filter); filter.connect(gainNode);
+            subNodes.push({ source: noise, end: time + 0.04 });
+        } else if (instrument === 'ohat') {
+            const noise = ctx.createBufferSource();
+            noise.buffer = createNoiseBuffer(0.4);
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(6000, time);
+            
+            gainNode.gain.setValueAtTime(0.5 * gainMult, time);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.28);
+            
+            noise.connect(filter); filter.connect(gainNode);
+            subNodes.push({ source: noise, end: time + 0.28 });
+        } else if (instrument === 'tom') {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(100, time);
+            osc.frequency.exponentialRampToValueAtTime(65, time + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.7 * gainMult, time);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+            
+            osc.connect(gainNode);
+            subNodes.push({ source: osc, end: time + 0.2 });
+        } else if (instrument === 'perc') {
+            const osc = ctx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(350, time);
+            osc.frequency.exponentialRampToValueAtTime(200, time + 0.03);
+            
+            gainNode.gain.setValueAtTime(0.6 * gainMult, time);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+            
+            osc.connect(gainNode);
+            subNodes.push({ source: osc, end: time + 0.08 });
+        } else if (instrument === 'cymbal') {
+            const noise = ctx.createBufferSource();
+            noise.buffer = createNoiseBuffer(0.8);
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(5000, time);
+            
+            gainNode.gain.setValueAtTime(0.4 * gainMult, time);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.6);
+            
+            noise.connect(filter); filter.connect(gainNode);
+            subNodes.push({ source: noise, end: time + 0.6 });
+        }
+
+        subNodes.forEach(item => {
+            const src = item.source;
+            const startT = item.start || time;
+            if (ctx === this.ctx && src.onended !== undefined) {
+                const trackItem = { source: src, gain: gainNode };
+                this.activeSources.add(trackItem);
+                src.onended = () => {
+                    this.activeSources.delete(trackItem);
+                };
+            }
+            src.start(startT);
+            src.stop(item.end);
+        });
     }
 
     _scheduleNote(stepNumber, baseTime) {
@@ -1074,21 +1271,22 @@ class AudioEngine {
         const triggerStep = (stepData) => {
             if (!stepData || !stepData.active) return;
             if (this.seqProbability < 1.0 && Math.random() > this.seqProbability) return;
-            if (this.slices.length === 0) return;
 
             let stepTime = time;
             if (stepData.microTiming) {
                 stepTime += stepData.microTiming;
             }
 
+            const isDrumHit = stepData.instrument !== undefined;
             const sliceIdLookup = stepData.sliceId !== undefined ? stepData.sliceId : stepNumber;
-            const sliceId = sliceIdLookup % this.slices.length;
+            const sliceId = this.slices.length > 0 ? (sliceIdLookup % this.slices.length) : 0;
             const slice = this.slices[sliceId];
-            if (!slice) return;
+
+            if (!isDrumHit && (!slice || this.slices.length === 0)) return;
 
             let rate = 1.0;
-            if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
-                if (slice.pitch && slice.pitch.midi > 0) {
+            if (!isDrumHit && this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
+                if (slice && slice.pitch && slice.pitch.midi > 0) {
                     const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
                     const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
                     let idx = validNotes.indexOf(closestMidi);
@@ -1114,7 +1312,7 @@ class AudioEngine {
                 const isChordTrigger = this.chordsEnabled && stepData.isChord;
                 const volMult = isChordTrigger ? 0.45 : 1.0;
 
-                if (this.sampleLevel > 0) {
+                if (this.sampleLevel > 0 && slice && this.slices.length > 0) {
                     const triggerSample = (targetSliceIdx, pitchRate) => this._createSource(targetSliceIdx, t, pitchRate, this.ctx, null, holdDur, volMult * this.sampleLevel, isLong);
                     triggerSample(sliceId, rate);
                     
@@ -1134,43 +1332,62 @@ class AudioEngine {
                     }
                 }
 
-                if (this.toneLevel > 0 && slice.pitch && slice.pitch.midi > 0) {
-                    let targetMidi = slice.pitch.midi;
-                    if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
-                        const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
-                        const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
-                        let idx = validNotes.indexOf(closestMidi);
-                        if (idx !== -1) {
-                            idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
-                            targetMidi = validNotes[idx] + (this.musicalOctave * 12);
-                            targetMidi = Math.max(24, Math.min(102, targetMidi));
+                if (this.toneLevel > 0) {
+                    if (isDrumHit) {
+                        this._createSynthDrumHit(stepData.instrument, t, holdDur, this.ctx, null, volMult * this.toneLevel);
+                    } else if (slice && slice.pitch && slice.pitch.midi > 0) {
+                        let targetMidi = slice.pitch.midi;
+                        if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
+                            const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
+                            const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                            let idx = validNotes.indexOf(closestMidi);
+                            if (idx !== -1) {
+                                idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                                targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                                targetMidi = Math.max(24, Math.min(102, targetMidi));
+                            }
                         }
-                    }
-                    
-                    const strategy = this.seqPattern.strategy || 'default';
-                    this._createTone(targetMidi, t, holdDur, this.ctx, null, volMult * this.toneLevel, isLong, strategy);
+                        
+                        const strategy = this.seqPattern.strategy || 'default';
+                        this._createTone(targetMidi, t, holdDur, this.ctx, null, volMult * this.toneLevel, isLong, strategy);
 
-                    if (isChordTrigger) {
-                        const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
-                        let idx = validNotes.indexOf(targetMidi);
-                        if (idx !== -1) {
-                            [2, 4].forEach(offset => {
-                                if (idx + offset < validNotes.length) {
-                                    this._createTone(validNotes[idx + offset], t, holdDur, this.ctx, null, volMult * this.toneLevel, isLong, strategy);
-                                }
-                            });
+                        if (isChordTrigger) {
+                            const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
+                            let idx = validNotes.indexOf(targetMidi);
+                            if (idx !== -1) {
+                                [2, 4].forEach(offset => {
+                                    if (idx + offset < validNotes.length) {
+                                        this._createTone(validNotes[idx + offset], t, holdDur, this.ctx, null, volMult * this.toneLevel, isLong, strategy);
+                                    }
+                                });
+                            }
                         }
                     }
                 }
             }
         };
 
-        const maskedPattern = this.getMaskedPattern();
-        triggerStep(maskedPattern[stepNumber]);
+        if (this.seqPattern && this.seqPattern.type === 'drum') {
+            if (this.seqPattern.drumTracks) {
+                this.seqPattern.drumTracks.forEach(track => {
+                    const stepData = track.steps ? track.steps[stepNumber] : null;
+                    if (stepData && stepData.active) {
+                        triggerStep({
+                            ...stepData,
+                            sliceId: track.sliceId !== undefined ? track.sliceId : stepData.sliceId,
+                            instrument: track.instrument
+                        });
+                    }
+                });
+            }
+        } else {
+            const maskedPattern = this.getMaskedPattern();
+            triggerStep(maskedPattern[stepNumber]);
 
-        if (this.contrastEnabled && this.contrastPattern) {
-            const maskedContrast = this.getMaskedContrastPattern();
-            triggerStep(maskedContrast[stepNumber]);
+            if (this.contrastEnabled && this.contrastPattern) {
+                const maskedContrast = this.getMaskedContrastPattern();
+                triggerStep(maskedContrast[stepNumber]);
+            }
         }
     }
 
@@ -1286,21 +1503,25 @@ class AudioEngine {
                         time += stepData.microTiming;
                     }
 
+                    const isDrumHit = stepData.instrument !== undefined;
                     const sliceIdLookup = stepData.sliceId !== undefined ? stepData.sliceId : stepNumber;
-                    const sliceId = sliceIdLookup % this.slices.length;
+                    const sliceId = this.slices.length > 0 ? (sliceIdLookup % this.slices.length) : 0;
                     const slice = this.slices[sliceId];
-                    if (!slice) return;
+
+                    if (!isDrumHit && (!slice || this.slices.length === 0)) return;
 
                     let rate = 1.0;
-                    if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined && slice.pitch && slice.pitch.midi > 0) {
-                        const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
-                        const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
-                        let idx = validNotes.indexOf(closestMidi);
-                        if (idx !== -1) {
-                            idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
-                            let targetMidi = validNotes[idx] + (this.musicalOctave * 12);
-                            targetMidi = Math.max(24, Math.min(102, targetMidi));
-                            rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
+                    if (!isDrumHit && this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
+                        if (slice && slice.pitch && slice.pitch.midi > 0) {
+                            const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
+                            const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                            let idx = validNotes.indexOf(closestMidi);
+                            if (idx !== -1) {
+                                idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                                let targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                                targetMidi = Math.max(24, Math.min(102, targetMidi));
+                                rate = ScaleQuantizer.getPlaybackRate(slice.pitch.midi, targetMidi);
+                            }
                         }
                     }
 
@@ -1316,7 +1537,7 @@ class AudioEngine {
                         let t = time + (r * ratchetSpacing);
                         const holdDur = ratchetSpacing * 0.9;
                         
-                        if (this.sampleLevel > 0) {
+                        if (this.sampleLevel > 0 && slice && this.slices.length > 0) {
                             this._createSource(sliceId, t, rate, offlineCtx, finalDest, holdDur, volMult * this.sampleLevel, isLong);
                             if (isChordTrigger) {
                                 const intervals = [3, 4, 7];
@@ -1333,39 +1554,59 @@ class AudioEngine {
                                 });
                             }
                         }
-                        if (this.toneLevel > 0 && slice.pitch && slice.pitch.midi > 0) {
-                            let targetMidi = slice.pitch.midi;
-                            if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
-                                const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
-                                const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
-                                let idx = validNotes.indexOf(closestMidi);
-                                if (idx !== -1) {
-                                    idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
-                                    targetMidi = validNotes[idx] + (this.musicalOctave * 12);
-                                    targetMidi = Math.max(24, Math.min(102, targetMidi));
+
+                        if (this.toneLevel > 0) {
+                            if (isDrumHit) {
+                                this._createSynthDrumHit(stepData.instrument, t, holdDur, offlineCtx, finalDest, volMult * this.toneLevel);
+                            } else if (slice && slice.pitch && slice.pitch.midi > 0) {
+                                let targetMidi = slice.pitch.midi;
+                                if (this.seqPattern.type === 'melodic' && stepData.melodicOffset !== undefined) {
+                                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
+                                    const closestMidi = ScaleQuantizer.quantizeMidi(slice.pitch.midi, this.musicalKey, this.musicalMode);
+                                    let idx = validNotes.indexOf(closestMidi);
+                                    if (idx !== -1) {
+                                        idx = Math.max(0, Math.min(validNotes.length - 1, idx + stepData.melodicOffset));
+                                        targetMidi = validNotes[idx] + (this.musicalOctave * 12);
+                                        targetMidi = Math.max(24, Math.min(102, targetMidi));
+                                    }
                                 }
-                            }
-                            const strategy = this.seqPattern.strategy || 'default';
-                            this._createTone(targetMidi, t, holdDur, offlineCtx, finalDest, volMult * this.toneLevel, isLong, strategy);
-                            if (isChordTrigger) {
-                                const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
-                                let idx = validNotes.indexOf(targetMidi);
-                                if (idx !== -1) {
-                                    [2, 4].forEach(offset => {
-                                        if (idx + offset < validNotes.length) {
-                                            this._createTone(validNotes[idx + offset], t, holdDur, offlineCtx, finalDest, volMult * this.toneLevel, isLong, strategy);
-                                        }
-                                    });
+                                const strategy = this.seqPattern.strategy || 'default';
+                                this._createTone(targetMidi, t, holdDur, offlineCtx, finalDest, volMult * this.toneLevel, isLong, strategy);
+                                if (isChordTrigger) {
+                                    const validNotes = ScaleQuantizer.getValidMidiNotes(this.musicalKey, this.musicalMode, 2, 4);
+                                    let idx = validNotes.indexOf(targetMidi);
+                                    if (idx !== -1) {
+                                        [2, 4].forEach(offset => {
+                                            if (idx + offset < validNotes.length) {
+                                                this._createTone(validNotes[idx + offset], t, holdDur, offlineCtx, finalDest, volMult * this.toneLevel, isLong, strategy);
+                                            }
+                                        });
+                                    }
                                 }
                             }
                         }
                     }
                 };
 
-                renderStep(maskedPattern[stepNumber]);
+                if (this.seqPattern && this.seqPattern.type === 'drum') {
+                    if (this.seqPattern.drumTracks) {
+                        this.seqPattern.drumTracks.forEach(track => {
+                            const stepData = track.steps ? track.steps[stepNumber] : null;
+                            if (stepData && stepData.active) {
+                                renderStep({
+                                    ...stepData,
+                                    sliceId: track.sliceId !== undefined ? track.sliceId : stepData.sliceId,
+                                    instrument: track.instrument
+                                });
+                            }
+                        });
+                    }
+                } else {
+                    renderStep(maskedPattern[stepNumber]);
 
-                if (this.contrastEnabled && maskedContrastPattern) {
-                    renderStep(maskedContrastPattern[stepNumber]);
+                    if (this.contrastEnabled && maskedContrastPattern) {
+                        renderStep(maskedContrastPattern[stepNumber]);
+                    }
                 }
             }
         }

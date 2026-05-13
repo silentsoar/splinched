@@ -182,6 +182,7 @@ const btnExportWet = document.getElementById('btn-export-wet');
 const btnExportDry = document.getElementById('btn-export-dry');
 const btnExportMidi = document.getElementById('btn-export-midi');
 const btnExportMidiChords = document.getElementById('btn-export-midi-chords');
+const btnExportMidiDrumGlobal = document.getElementById('btn-export-midi-drum');
 const filenameDisplay = document.getElementById('filename-display');
 const midiStatus = document.getElementById('midi-status');
 const autoKeyDisplay = document.getElementById('auto-key-display');
@@ -218,9 +219,17 @@ const labelVerse = document.getElementById('label-verse');
 const seqSliceAssignToggle = document.getElementById('seq-slice-assign-toggle');
 const labelFit = document.getElementById('label-fit');
 const labelSeq = document.getElementById('label-seq');
+const seqModeToggle = document.getElementById('seq-mode-toggle');
+const labelModeMel = document.getElementById('label-mode-mel');
+const labelModeDrum = document.getElementById('label-mode-drum');
 const autoBpmBtn = document.getElementById('btn-auto-bpm');
 const algoLenSelect = document.getElementById('algo-len');
 const seqMeterSelect = document.getElementById('seq-meter');
+const drumPaginationWrapper = document.getElementById('drum-pagination-wrapper');
+const btnDrumPrev = document.getElementById('btn-drum-prev');
+const btnDrumNext = document.getElementById('btn-drum-next');
+const labelDrumPage = document.getElementById('label-drum-page');
+let currentDrumPage = 0;
 
 // Keyboard shortcut map
 const KEYS = [
@@ -505,8 +514,21 @@ async function init() {
 
     engine.onStepPlay = (stepNumber) => {
         document.querySelectorAll('.seq-step').forEach(el => el.classList.remove('playing'));
-        const stepEl = document.getElementById(`seq-step-${stepNumber}`);
-        if (stepEl) stepEl.classList.add('playing');
+        if (engine.seqPattern && engine.seqPattern.type === 'drum') {
+            const targetPage = Math.floor(stepNumber / 16);
+            if (currentDrumPage !== targetPage) {
+                currentDrumPage = targetPage;
+                renderSequencerGrid();
+            }
+            const instruments = ['kick', 'snare', 'clap', 'chat', 'ohat', 'tom', 'perc', 'cymbal'];
+            instruments.forEach(inst => {
+                const el = document.getElementById(`drum-step-${inst}-${stepNumber}`);
+                if (el) el.classList.add('playing');
+            });
+        } else {
+            const stepEl = document.getElementById(`seq-step-${stepNumber}`);
+            if (stepEl) stepEl.classList.add('playing');
+        }
         updatePlayIcons();
     };
     updatePlayIcons();
@@ -516,6 +538,9 @@ function populatePatterns(preserveSelection = false) {
     const prevValue = patternSelect.value;
     patternSelect.innerHTML = '';
     
+    const drumGroup = document.createElement('optgroup');
+    drumGroup.label = "Drum Patterns";
+
     const rhythmicGroup = document.createElement('optgroup');
     rhythmicGroup.label = "Rhythmic Patterns";
     
@@ -532,6 +557,8 @@ function populatePatterns(preserveSelection = false) {
         
         if (pat.isSavedSequence) {
             savedGroup.appendChild(opt);
+        } else if (pat.type === 'drum') {
+            drumGroup.appendChild(opt);
         } else if (pat.type === 'rhythmic') {
             rhythmicGroup.appendChild(opt);
         } else {
@@ -539,6 +566,7 @@ function populatePatterns(preserveSelection = false) {
         }
     });
 
+    if (drumGroup.children.length > 0) patternSelect.appendChild(drumGroup);
     patternSelect.appendChild(rhythmicGroup);
     patternSelect.appendChild(melodicGroup);
     if (savedGroup.children.length > 0) {
@@ -894,6 +922,63 @@ function setupEventListeners() {
         }
     }
 
+    if (seqModeToggle) {
+        const updateSeqModeUI = () => {
+            const isDrum = seqModeToggle.checked;
+            engine.sequencerMode = isDrum ? 'drum' : 'melody';
+            if (labelModeMel && labelModeDrum) {
+                labelModeMel.className = isDrum ? 'toggle-label' : 'toggle-label active-primary';
+                labelModeDrum.className = isDrum ? 'toggle-label active-secondary' : 'toggle-label';
+                labelModeMel.style.color = isDrum ? 'var(--text-muted)' : '';
+                labelModeDrum.style.color = isDrum ? '' : 'var(--text-muted)';
+            }
+            const btnExportMidiMel = document.getElementById('btn-export-midi');
+            const btnExportMidiChords = document.getElementById('btn-export-midi-chords');
+            const btnExportMidiDrum = document.getElementById('btn-export-midi-drum');
+            if (btnExportMidiMel) btnExportMidiMel.style.display = isDrum ? 'none' : 'inline-flex';
+            if (btnExportMidiChords) btnExportMidiChords.style.display = isDrum ? 'none' : 'inline-flex';
+            if (btnExportMidiDrum) btnExportMidiDrum.style.display = isDrum ? 'inline-flex' : 'none';
+
+            saveSettings();
+            const currentStrategy = Object.keys(algoButtons).find(k => algoButtons[k] && algoButtons[k].classList.contains('btn-primary')) || 'Harmonic';
+            generateAlgorithmicPattern(currentStrategy);
+        };
+        seqModeToggle.addEventListener('change', updateSeqModeUI);
+        if (labelModeMel) {
+            labelModeMel.addEventListener('click', () => {
+                seqModeToggle.checked = false;
+                updateSeqModeUI();
+            });
+        }
+        if (labelModeDrum) {
+            labelModeDrum.addEventListener('click', () => {
+                seqModeToggle.checked = true;
+                updateSeqModeUI();
+            });
+        }
+    }
+
+    if (btnDrumPrev) {
+        btnDrumPrev.addEventListener('click', () => {
+            if (currentDrumPage > 0) {
+                currentDrumPage--;
+                renderSequencerGrid();
+            }
+        });
+    }
+    if (btnDrumNext) {
+        btnDrumNext.addEventListener('click', () => {
+            const pat = SequencerPatterns.find(p => p.id == patternSelect.value);
+            if (pat && pat.type === 'drum') {
+                const maxPage = Math.max(0, Math.ceil(pat.length / 16) - 1);
+                if (currentDrumPage < maxPage) {
+                    currentDrumPage++;
+                    renderSequencerGrid();
+                }
+            }
+        });
+    }
+
 
 
     Object.keys(algoButtons).forEach(strategy => {
@@ -1011,6 +1096,7 @@ function setupEventListeners() {
     if (btnExportDry) btnExportDry.addEventListener('click', () => exportSequence(false));
     if (btnExportMidi) btnExportMidi.addEventListener('click', exportMidi);
     if (btnExportMidiChords) btnExportMidiChords.addEventListener('click', exportMidiChords);
+    if (btnExportMidiDrumGlobal) btnExportMidiDrumGlobal.addEventListener('click', exportMidiDrum);
     // Demo File
     const btnLoadDemo = document.getElementById('btn-load-demo');
     if (btnLoadDemo) {
@@ -1061,6 +1147,86 @@ function generateAlgorithmicPattern(strategy) {
     const len = parseInt(algoLenSelect.value) || 64;
     const validNotes = ScaleQuantizer.getValidMidiNotes(engine.musicalKey, engine.musicalMode, 2, 4);
     
+    if (engine.sequencerMode === 'drum') {
+        const mapping = engine.classifySlicesForDrumKit();
+        const instruments = ['kick', 'snare', 'clap', 'chat', 'ohat', 'tom', 'perc', 'cymbal'];
+        
+        let drumTracks = instruments.map(inst => ({
+            instrument: inst,
+            sliceId: mapping[inst] || 0,
+            steps: new Array(len).fill(null).map((_, idx) => ({ step: idx, active: false }))
+        }));
+
+        const setHits = (instName, patternArr, prob = 1.0, ratchetIntervals = {}) => {
+            const trk = drumTracks.find(t => t.instrument === instName);
+            if (!trk) return;
+            for (let s = 0; s < len; s++) {
+                if (patternArr[s % patternArr.length] && Math.random() < prob) {
+                    trk.steps[s] = {
+                        step: s,
+                        active: true,
+                        ratchets: ratchetIntervals[s % 16] || 1
+                    };
+                }
+            }
+        };
+
+        const dense = (engine.seqDensity || 0.5);
+        
+        if (strategy === 'House' || strategy === 'Acid' || strategy === 'Trance' || strategy === 'Slap House') {
+            setHits('kick', [1, 0, 0, 0], dense * 1.5);
+            setHits('clap', [0, 0, 0, 0, 1, 0, 0, 0], dense * 1.2);
+            setHits('ohat', [0, 0, 1, 0], dense * 1.4);
+            setHits('chat', [1, 1, 1, 1, 1, 1, 1, 1], dense * 0.8);
+            setHits('perc', [0, 1, 0, 1, 0, 0, 1, 0], dense * 0.6);
+        } else if (strategy === 'Trap' || strategy === 'Drill' || strategy === 'Hyperpop' || strategy === 'Phonk') {
+            setHits('kick', [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0], dense * 1.5);
+            setHits('snare', [0, 0, 0, 0, 1, 0, 0, 0], dense * 1.5);
+            setHits('chat', [1, 1, 1, 1, 1, 1, 1, 1], dense * 1.6, { 2: 2, 6: 3, 14: 4 });
+            setHits('tom', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0], dense * 0.7);
+            setHits('cymbal', [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dense * 0.5);
+        } else if (strategy === 'Breakbeat' || strategy === 'Jungle' || strategy === 'Drum & Bass' || strategy === 'Neuro') {
+            setHits('kick', [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], dense * 1.4);
+            setHits('snare', [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0], dense * 1.3);
+            setHits('chat', [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0], dense * 1.2);
+            setHits('perc', [0, 1, 0, 1, 0, 0, 1, 0], dense * 0.9);
+        } else if (strategy === 'Jersey Club' || strategy === 'Footwork') {
+            setHits('kick', [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0], dense * 1.6);
+            setHits('chat', [1, 0, 1, 0, 1, 0, 1, 0], dense * 1.2);
+            setHits('clap', [0, 0, 0, 0, 1, 0, 0, 0], dense * 1.3);
+            setHits('perc', [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], dense * 1.1);
+        } else if (strategy === 'R&B' || strategy === 'Neo-Soul' || strategy === 'Future Bass') {
+            setHits('kick', [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], dense * 1.3);
+            setHits('snare', [0, 0, 0, 0, 1, 0, 0, 0], dense * 1.4);
+            setHits('chat', [1, 0, 1, 0, 1, 0, 1, 0], dense * 1.1);
+            setHits('ohat', [0, 0, 0, 0, 0, 0, 1, 0], dense * 0.8);
+        } else {
+            setHits('kick', [1, 0, 0, 0, 0, 0, 1, 0], dense * 1.3);
+            setHits('snare', [0, 0, 0, 0, 1, 0, 0, 0], dense * 1.3);
+            setHits('chat', [1, 1, 0, 1, 1, 1, 0, 1], dense * 1.1);
+            setHits('tom', [0, 0, 1, 0, 0, 0, 0, 0], dense * 0.6);
+            setHits('perc', [0, 0, 0, 1, 0, 1, 0, 0], dense * 0.8);
+        }
+
+        const newPat = {
+            id: 'drum_' + Date.now(),
+            name: strategy + ' Drums ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
+            strategy: strategy,
+            type: 'drum',
+            length: len,
+            drumTracks: drumTracks,
+            isCustom: true
+        };
+
+        SequencerPatterns.push(newPat);
+        saveCustomPatterns();
+        populatePatterns();
+        patternSelect.value = newPat.id;
+        engine.seqPattern = newPat;
+        renderSequencerGrid();
+        return;
+    }
+
     let steps = [];
     const isVerse = engine.songPart === 'verse';
     // Verse section patterns have slightly sparser density to accommodate vocal/lead lines
@@ -1081,15 +1247,20 @@ function generateAlgorithmicPattern(strategy) {
 
     const findBestSlice = (targetIdx) => {
         if (isSeqMode) {
-            const assignedId = seqSliceCounter % engine.slices.length;
-            seqSliceCounter++;
-            return assignedId;
+            if (engine.slices.length > 1) {
+                const assignedId = 1 + (seqSliceCounter % (engine.slices.length - 1));
+                seqSliceCounter++;
+                return assignedId;
+            } else {
+                return 0;
+            }
         }
         const optimizedIdx = getOptimizedIdx(targetIdx);
         const targetMidi = validNotes[optimizedIdx];
-        let bestSliceId = 0;
+        let bestSliceId = engine.slices.length > 1 ? 1 : 0;
         let minDiff = Infinity;
         engine.slices.forEach((slice, idx) => {
+            if (idx === 0 && engine.slices.length > 1) return;
             if (slice.pitch && slice.pitch.midi > 0) {
                 const diff = Math.abs(slice.pitch.midi - targetMidi);
                 if (diff < minDiff) { minDiff = diff; bestSliceId = idx; }
@@ -2085,6 +2256,120 @@ function renderSequencerGrid() {
     const pattern = SequencerPatterns.find(p => p.id == patId);
     if (!pattern) return;
 
+    if (pattern.type === 'drum') {
+        const totalPages = Math.ceil(pattern.length / 16);
+        const maxPage = Math.max(0, totalPages - 1);
+        if (currentDrumPage > maxPage) currentDrumPage = maxPage;
+        
+        if (drumPaginationWrapper) {
+            drumPaginationWrapper.style.display = totalPages > 1 ? 'flex' : 'none';
+            if (labelDrumPage) {
+                labelDrumPage.textContent = `Page ${currentDrumPage + 1}/${totalPages}`;
+            }
+        }
+
+        const startIndex = currentDrumPage * 16;
+        const columns = Math.min(pattern.length - startIndex, 16);
+        seqGrid.style.gridTemplateColumns = `120px repeat(${columns}, 1fr)`;
+        seqGrid.innerHTML = '';
+
+        const instruments = ['kick', 'snare', 'clap', 'chat', 'ohat', 'tom', 'perc', 'cymbal'];
+        const labels = {
+            kick: 'Kick', snare: 'Snare', clap: 'Clap', chat: 'Closed Hat',
+            ohat: 'Open Hat', tom: 'Tom', perc: 'Perc', cymbal: 'Cymbal'
+        };
+
+        const stepsPerBeat = engine.stepsPerBeat || 4;
+        let stepsPerBar = stepsPerBeat * 4;
+        if (engine.currentMeter === '3/4') stepsPerBar = stepsPerBeat * 3;
+        if (engine.currentMeter === '5/4') stepsPerBar = stepsPerBeat * 5;
+        if (engine.currentMeter === '6/8') stepsPerBar = 6;
+        if (engine.currentMeter === '7/4') stepsPerBar = stepsPerBeat * 7;
+
+        pattern.drumTracks.forEach((track) => {
+            const headerEl = document.createElement('div');
+            headerEl.className = 'drum-track-header';
+            headerEl.style.cssText = 'display:flex; flex-direction:column; justify-content:center; padding:0 8px; background:rgba(0,0,0,0.3); border-right:2px solid var(--border-color); border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.75rem; font-weight:bold; color:var(--text-color); user-select:none;';
+            headerEl.innerHTML = `
+                <div>${labels[track.instrument]}</div>
+                <div style="font-size:0.55rem; color:var(--accent-primary); cursor:pointer;" title="Click to Audition Slice">Slice ${track.sliceId + 1}</div>
+            `;
+            
+            const sliceBadge = headerEl.querySelector('div:last-child');
+            sliceBadge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (engine.slices && engine.slices[track.sliceId]) {
+                    engine._createSource(track.sliceId, engine.ctx.currentTime, 1.0, engine.ctx, null, 0.4, engine.sampleLevel || 0.8, false);
+                }
+            });
+            seqGrid.appendChild(headerEl);
+
+            for (let c = 0; c < columns; c++) {
+                const s = startIndex + c;
+                const stepData = track.steps[s];
+                const stepEl = document.createElement('div');
+                stepEl.className = 'seq-step drum-step';
+                stepEl.id = `drum-step-${track.instrument}-${s}`;
+                stepEl.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                stepEl.style.minHeight = '36px';
+                stepEl.style.cursor = 'pointer';
+                stepEl.style.position = 'relative';
+
+                const barIndex = Math.floor(s / stepsPerBar);
+                if (barIndex % 2 === 1) stepEl.style.background = 'rgba(255, 255, 255, 0.04)';
+                else stepEl.style.background = 'rgba(255, 255, 255, 0.01)';
+
+                if (s % stepsPerBar === 0) stepEl.style.borderLeft = '2px solid rgba(255, 255, 255, 0.25)';
+                else if (s % stepsPerBeat === 0) stepEl.style.borderLeft = '1px solid rgba(255, 255, 255, 0.1)';
+
+                const applyActiveStyles = () => {
+                    stepEl.classList.add('active');
+                    if (track.instrument === 'kick') stepEl.style.borderColor = '#ef4444';
+                    else if (track.instrument === 'snare' || track.instrument === 'clap') stepEl.style.borderColor = '#f59e0b';
+                    else if (track.instrument === 'chat' || track.instrument === 'ohat') stepEl.style.borderColor = '#10b981';
+                    else stepEl.style.borderColor = 'var(--accent-primary)';
+                    
+                    let inner = `<div style="font-size:0.45rem; color:rgba(255,255,255,0.2); position:absolute; top:2px; left:2px; pointer-events:none;">${s + 1}</div>`;
+                    if (stepData && stepData.ratchets && stepData.ratchets > 1) {
+                        inner += `<span class="ratchet-badge" style="font-size:0.45rem;">x${stepData.ratchets}</span>`;
+                    }
+                    stepEl.innerHTML = inner;
+                };
+
+                if (stepData && stepData.active) {
+                    applyActiveStyles();
+                } else {
+                    stepEl.innerHTML = `<div style="font-size:0.45rem; color:rgba(255,255,255,0.2); position:absolute; top:2px; left:2px; pointer-events:none;">${s + 1}</div>`;
+                }
+
+                if (engine.seqIsPlaying && engine.seqCurrentStep === s) {
+                    stepEl.classList.add('playing');
+                }
+
+                stepEl.addEventListener('click', () => {
+                    if (stepData) {
+                        stepData.active = !stepData.active;
+                        if (stepData.active) {
+                            applyActiveStyles();
+                        } else {
+                            stepEl.classList.remove('active');
+                            stepEl.style.borderColor = '';
+                            stepEl.innerHTML = `<div style="font-size:0.45rem; color:rgba(255,255,255,0.2); position:absolute; top:2px; left:2px; pointer-events:none;">${s + 1}</div>`;
+                        }
+                        saveCustomPatterns();
+                    }
+                });
+
+                seqGrid.appendChild(stepEl);
+            }
+        });
+        return;
+    }
+
+    if (drumPaginationWrapper) {
+        drumPaginationWrapper.style.display = 'none';
+    }
+
     const columns = Math.min(pattern.length, 16);
     seqGrid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
     seqGrid.innerHTML = '';
@@ -2589,6 +2874,27 @@ async function exportMidiChords() {
     }
 }
 
+async function exportMidiDrum() {
+    if (!engine.buffer || engine.slices.length === 0) return;
+    
+    const patId = patternSelect.value;
+    const pattern = SequencerPatterns.find(p => p.id == patId);
+    
+    showLoading('Generating MIDI Drum Pattern', 'Creating multi-track GM Drum MIDI file...');
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    try {
+        const blob = MidiExporter.generateDrumMidiBlob(pattern, parseInt(bpmInput.value));
+        if (blob) {
+            downloadBlob(blob, `drum-pattern-${pattern.name.replace(/\s+/g, '-').toLowerCase()}.mid`);
+        }
+    } catch(err) {
+        alert("Error generating MIDI Drum pattern: " + err);
+    } finally {
+        hideLoading();
+    }
+}
+
 
 function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
@@ -2698,7 +3004,8 @@ function saveSettings() {
         autoTimbre: autoTimbreEnabled,
         moreLongNotes: moreLongNotesCheck ? moreLongNotesCheck.checked : false,
         contrast: contrastCheck ? contrastCheck.checked : false,
-        sliceAssignMode: engine.sliceAssignMode || 'fit'
+        sliceAssignMode: engine.sliceAssignMode || 'fit',
+        sequencerMode: engine.sequencerMode || 'melody'
     };
     localStorage.setItem('splinchedSettings', JSON.stringify(settings));
 }
@@ -2779,6 +3086,17 @@ function loadSettings() {
                     labelSeq.className = isSeq ? 'toggle-label active-secondary' : 'toggle-label';
                     labelFit.style.color = isSeq ? 'var(--text-muted)' : '';
                     labelSeq.style.color = isSeq ? '' : 'var(--text-muted)';
+                }
+            }
+            engine.sequencerMode = settings.sequencerMode || 'melody';
+            if (seqModeToggle) {
+                const isDrum = engine.sequencerMode === 'drum';
+                seqModeToggle.checked = isDrum;
+                if (labelModeMel && labelModeDrum) {
+                    labelModeMel.className = isDrum ? 'toggle-label' : 'toggle-label active-primary';
+                    labelModeDrum.className = isDrum ? 'toggle-label active-secondary' : 'toggle-label';
+                    labelModeMel.style.color = isDrum ? 'var(--text-muted)' : '';
+                    labelModeDrum.style.color = isDrum ? '' : 'var(--text-muted)';
                 }
             }
             if (partToggle) {

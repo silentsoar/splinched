@@ -146,6 +146,70 @@ class MidiExporter {
         return new Blob([new Uint8Array([...header, ...trackHeader, ...trackEvents])], { type: 'audio/midi' });
     }
 
+    static generateDrumMidiBlob(pattern, bpm) {
+        if (!pattern || !pattern.drumTracks) return null;
+
+        const ticksPerBeat = 480;
+        const ticksPerStep = ticksPerBeat / 4; // 16th notes
+        
+        // Header Format 0, 1 track
+        const header = [
+            0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01,
+            (ticksPerBeat >> 8) & 0xFF, ticksPerBeat & 0xFF
+        ];
+
+        const tempo = Math.round(60000000 / bpm);
+        const metaTempo = [
+            0x00, 0xFF, 0x51, 0x03, 
+            (tempo >> 16) & 0xFF, (tempo >> 8) & 0xFF, tempo & 0xFF
+        ];
+
+        const GM_DRUM_MAP = {
+            kick: 36, snare: 38, clap: 39, chat: 42,
+            ohat: 46, tom: 47, perc: 56, cymbal: 49
+        };
+
+        const rawEvents = [];
+
+        pattern.drumTracks.forEach(track => {
+            const noteNum = GM_DRUM_MAP[track.instrument] || 36;
+            if (track.steps) {
+                track.steps.forEach((step, i) => {
+                    if (step && step.active) {
+                        const startTick = i * ticksPerStep;
+                        // GM Drums map to Channel 10 (status 0x99 Note On, 0x89 Note Off)
+                        rawEvents.push({ tick: startTick, status: 0x99, note: noteNum, vel: 100 });
+                        rawEvents.push({ tick: startTick + Math.round(ticksPerStep * 0.5), status: 0x89, note: noteNum, vel: 0 });
+                    }
+                });
+            }
+        });
+
+        rawEvents.sort((a, b) => {
+            if (a.tick !== b.tick) return a.tick - b.tick;
+            return a.status - b.status;
+        });
+
+        const trackEvents = [...metaTempo];
+        let lastTick = 0;
+
+        rawEvents.forEach(evt => {
+            const delta = evt.tick - lastTick;
+            this._addEvent(trackEvents, delta, evt.status, evt.note, evt.vel);
+            lastTick = evt.tick;
+        });
+
+        trackEvents.push(0x00, 0xFF, 0x2F, 0x00);
+
+        const trackHeader = [
+            0x4D, 0x54, 0x72, 0x6B,
+            (trackEvents.length >> 24) & 0xFF, (trackEvents.length >> 16) & 0xFF,
+            (trackEvents.length >> 8) & 0xFF, trackEvents.length & 0xFF
+        ];
+
+        return new Blob([new Uint8Array([...header, ...trackHeader, ...trackEvents])], { type: 'audio/midi' });
+    }
+
     static _addEvent(events, deltaTime, status, data1, data2) {
         // Variable-length quantity for delta time
         const buffer = [];

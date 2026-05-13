@@ -256,6 +256,19 @@
                                 </label>
                                 <span class="toggle-label" id="label-seq" style="color: var(--text-muted); cursor: pointer;" title="Assign slices sequentially in chopped order">Sequential</span>
                             </div>
+                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px; border: 1px solid var(--accent-primary);">
+                                <span class="toggle-label active-primary" id="label-mode-mel" style="cursor: pointer;" title="Generate monophonic/polyphonic melodies">Melody</span>
+                                <label class="part-switch" title="Toggle Sequencer Layout Mode">
+                                    <input type="checkbox" id="seq-mode-toggle">
+                                    <span class="slider"></span>
+                                </label>
+                                <span class="toggle-label" id="label-mode-drum" style="color: var(--text-muted); cursor: pointer;" title="Transform grid into an 8-track drum machine">Drum</span>
+                            </div>
+                            <div id="drum-pagination-wrapper" class="param-group" style="display: none; width: auto; flex-direction: row !important; align-items: center; gap: 0.4rem; background: rgba(16, 185, 129, 0.1); padding: 0.4rem 0.8rem; border-radius: 8px; border: 1px solid #10b981;">
+                                <button id="btn-drum-prev" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">◄</button>
+                                <span id="label-drum-page" style="font-size: 0.75rem; font-weight: bold; color: #10b981; min-width: 50px; text-align: center;">Page 1/4</span>
+                                <button id="btn-drum-next" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">►</button>
+                            </div>
                         </div>
 
 
@@ -282,6 +295,9 @@
                                     </button>
                                     <button id="btn-export-midi-chords" class="btn btn-secondary" title="Download MIDI Chords">
                                         <i class="fas fa-layer-group"></i> Chords
+                                    </button>
+                                    <button id="btn-export-midi-drum" class="btn btn-secondary" title="Download MIDI Drum Pattern" style="display:none;">
+                                        <i class="fas fa-drum"></i> Pattern
                                     </button>
                                 </div>
                             </div>

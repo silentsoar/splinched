@@ -97,10 +97,50 @@ class PitchDetector {
             midi = -1;
         }
 
+        // --- Drum DSP Analysis ---
+        const fullLength = endOffset - startOffset;
+        const fullData = audioBuffer.getChannelData(0).slice(startOffset, endOffset);
+        
+        let crossings = 0;
+        let peakAmp = 0;
+        let peakIndex = 0;
+        
+        for (let i = 1; i < fullLength; i++) {
+            const val = fullData[i];
+            const prev = fullData[i - 1];
+            if ((val >= 0 && prev < 0) || (val < 0 && prev >= 0)) {
+                crossings++;
+            }
+            const absVal = Math.abs(val);
+            if (absVal > peakAmp) {
+                peakAmp = absVal;
+                peakIndex = i;
+            }
+        }
+        
+        const zcr = fullLength > 0 ? crossings / fullLength : 0;
+        const durationSec = fullLength / audioBuffer.sampleRate;
+        const attackSec = peakIndex / audioBuffer.sampleRate;
+        
+        let drumType = 'perc';
+        if (zcr < 0.05) {
+            drumType = durationSec > 0.15 ? 'kick' : 'tom';
+        } else if (zcr < 0.12) {
+            drumType = 'tom';
+        } else if (zcr < 0.28) {
+            drumType = attackSec < 0.015 ? 'snare' : 'clap';
+        } else if (zcr < 0.45) {
+            drumType = durationSec < 0.12 ? 'chat' : 'ohat';
+        } else {
+            drumType = durationSec < 0.15 ? 'chat' : 'cymbal';
+        }
+
         return {
             freq: midi === -1 ? -1 : freq,
             midi: midi, // -1 means unpitched
-            noteName: this.midiToNoteName(midi)
+            noteName: this.midiToNoteName(midi),
+            zcr: zcr,
+            drumType: drumType
         };
     }
 
