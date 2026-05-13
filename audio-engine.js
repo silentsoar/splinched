@@ -64,6 +64,7 @@ class AudioEngine {
         this.smartCompEnabled = false;
         this.contrastEnabled = false;
         this.contrastPattern = null;
+        this.adsrDeviation = 0.0;
         this._setupEffects();
     }
 
