@@ -11,7 +11,7 @@
     <meta name="description" content="Professional web-based music sample chopper and sequencer.">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=4">
 </head>
 
 <body>
@@ -85,42 +85,44 @@
                             </div>
                         </div>
 
-                        <div class="param-row">
-                            <div class="param-group flex-1">
+                        <div class="param-row nowrap-desktop">
+                            <div class="param-group flex-1" style="min-width: 0;">
                                 <label for="pattern-select">Pattern</label>
                                 <select id="pattern-select" class="custom-select">
                                     <!-- Populated by JS -->
                                 </select>
                             </div>
-                            <div class="param-group" style="width: 80px;">
-                                <div style="display: flex; align-items: center; justify-content: space-between;">
-                                    <label for="seq-bpm">BPM</label>
-                                    <button id="btn-auto-bpm" class="btn btn-secondary btn-auto-bpm-active" title="Auto BPM per genre" style="padding: 0 0.3rem; font-size: 0.6rem; height: 16px; line-height: 14px; min-width: 32px;">Auto</button>
+                            <div class="seq-controls-group" style="display: flex; gap: 1rem;">
+                                <div class="param-group seq-control-item" style="width: 80px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                                        <label for="seq-bpm">BPM</label>
+                                        <button id="btn-auto-bpm" class="btn btn-secondary btn-auto-bpm-active" title="Auto BPM per genre" style="padding: 0 0.3rem; font-size: 0.6rem; height: 16px; line-height: 14px; min-width: 32px;">Auto</button>
+                                    </div>
+                                    <input type="number" id="seq-bpm" value="120" min="40" max="300" class="custom-select">
                                 </div>
-                                <input type="number" id="seq-bpm" value="120" min="40" max="300" class="custom-select">
-                            </div>
-                            <div class="param-group" style="width: 80px;">
-                                <label for="seq-meter">Meter</label>
-                                <select id="seq-meter" class="custom-select">
-                                    <option value="4/4">4/4</option>
-                                    <option value="3/4">3/4</option>
-                                    <option value="5/4">5/4</option>
-                                    <option value="6/8">6/8</option>
-                                    <option value="7/4">7/4</option>
-                                </select>
-                            </div>
-                            <div class="param-group" style="width: 80px;">
-                                <label for="algo-len">Steps</label>
-                                <select id="algo-len" class="custom-select"
-                                    style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4);"
-                                    title="Generation Length">
-                                    <option value="8">8</option>
-                                    <option value="16">16</option>
-                                    <option value="32">32</option>
-                                    <option value="64" selected>64</option>
-                                    <option value="128">128</option>
-                                    <option value="256">256</option>
-                                </select>
+                                <div class="param-group seq-control-item" style="width: 80px;">
+                                    <label for="seq-meter">Meter</label>
+                                    <select id="seq-meter" class="custom-select">
+                                        <option value="4/4">4/4</option>
+                                        <option value="3/4">3/4</option>
+                                        <option value="5/4">5/4</option>
+                                        <option value="6/8">6/8</option>
+                                        <option value="7/4">7/4</option>
+                                    </select>
+                                </div>
+                                <div class="param-group seq-control-item" style="width: 80px;">
+                                    <label for="algo-len">Steps</label>
+                                    <select id="algo-len" class="custom-select"
+                                        style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4);"
+                                        title="Generation Length">
+                                        <option value="8">8</option>
+                                        <option value="16">16</option>
+                                        <option value="32">32</option>
+                                        <option value="64" selected>64</option>
+                                        <option value="128">128</option>
+                                        <option value="256">256</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
