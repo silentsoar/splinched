@@ -1062,6 +1062,8 @@ input[type=range]::-webkit-slider-runnable-track {
     width: 44px;
     height: 22px;
     margin: 0;
+    flex-shrink: 0;
+    min-width: 44px;
 }
 
 .part-switch input {

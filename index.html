@@ -80,7 +80,9 @@
                             <h2>Sequencer</h2>
                             <div style="display: flex; gap: 1rem; align-items: center;">
                                 <div class="playback-controls">
-                                    <button id="btn-toggle-seq" class="btn btn-icon" title="Toggle Sequencer"><i class="fas fa-play"></i></button>
+                                    <button id="btn-toggle-seq" class="btn btn-primary" title="Toggle Sequencer" style="width: 60px; height: 60px; border-radius: 50%; font-size: 1.6rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 25px rgba(16, 185, 129, 0.6); border: 2px solid rgba(255, 255, 255, 0.15); padding: 0;">
+                                        <i class="fas fa-play"></i>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -248,7 +250,9 @@
                                 <label style="margin: 0;" for="seq-tune" title="Tune slices to exact pitch of the step">Tune</label>
                                 <input type="checkbox" id="seq-tune" class="custom-checkbox">
                             </div>
-                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
+                        </div>
+                        <div class="param-row mt-05rem">
+                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; justify-content: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
                                 <span class="toggle-label active-primary" id="label-chorus" style="cursor: pointer;">Chorus</span>
                                 <label class="part-switch" title="Toggle Song Part">
                                     <input type="checkbox" id="seq-part-toggle">
@@ -256,7 +260,7 @@
                                 </label>
                                 <span class="toggle-label" id="label-verse" style="color: var(--text-muted); cursor: pointer;">Verse</span>
                             </div>
-                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
+                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; justify-content: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
                                 <span class="toggle-label active-primary" id="label-fit" style="cursor: pointer;" title="Assign slices matching target scale pitches">Fit</span>
                                 <label class="part-switch" title="Toggle Slice Assignment Mode">
                                     <input type="checkbox" id="seq-slice-assign-toggle">
@@ -264,7 +268,7 @@
                                 </label>
                                 <span class="toggle-label" id="label-seq" style="color: var(--text-muted); cursor: pointer;" title="Assign slices sequentially in chopped order">Sequential</span>
                             </div>
-                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px; border: 1px solid var(--accent-primary);">
+                            <div class="param-group" style="width: auto; flex-direction: row !important; align-items: center; justify-content: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px; border: 1px solid var(--accent-primary);">
                                 <span class="toggle-label active-primary" id="label-mode-mel" style="cursor: pointer;" title="Generate monophonic/polyphonic melodies">Melody</span>
                                 <label class="part-switch" title="Toggle Sequencer Layout Mode">
                                     <input type="checkbox" id="seq-mode-toggle">
