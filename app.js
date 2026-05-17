@@ -510,6 +510,20 @@ async function init() {
         } finally {
             hideLoading();
         }
+    } else {
+        // Automatically load demo track instead of waiting at splash screen
+        if (engine.ctx.state === 'suspended') await engine.ctx.resume().catch(e => console.warn('AudioContext resume failed:', e));
+        showLoading('Downloading Demo', 'Fetching professional sample pack...');
+        try {
+            if (filenameDisplay) filenameDisplay.textContent = 'I Wandered Lonely (Demo)';
+            const response = await fetch('https://dn710005.ca.archive.org/0/items/spc251_2405_librivox/spc251_iwanderedlonely_mj_128kb.mp3');
+            if (!response.ok) throw new Error('Network response was not ok');
+            const arrayBuffer = await response.arrayBuffer();
+            await loadAndProcessArrayBuffer(arrayBuffer);
+        } catch (err) {
+            console.error("Error loading demo file", err);
+            hideLoading();
+        }
     }
 
 
